@@ -1,10 +1,5 @@
 
-import {
-  IEmailService,
-  SuspensionEmailData,
-  BanEmailData,
-  AppealMessageEmailData,
-} from '../../domain/services/email.service';
+import { IEmailService, SuspensionEmailData, BanEmailData,AppealMessageEmailData} from '../../domain/services/email.service';
 import { transporter } from '../config/mail';
 
 

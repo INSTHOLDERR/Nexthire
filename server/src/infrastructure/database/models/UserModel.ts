@@ -94,11 +94,9 @@ const userSchema = new Schema(
 
 userSchema.pre('save', async function (next) {
   if ((this as any).$locals?.skipPasswordHash) return next();
-
   if (!this.isModified('password') || !this.password) {
     return next();
   }
-
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
@@ -110,6 +108,5 @@ userSchema.methods.matchPassword = async function (
 };
 
 export const UserModel = mongoose.model(
-  'User',
-  userSchema
+  'User', userSchema
 );

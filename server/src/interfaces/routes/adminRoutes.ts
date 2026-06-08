@@ -1,8 +1,8 @@
 
-import {Router, Request, Response, NextFunction,} from 'express';
+import {Router, Request, Response, NextFunction} from 'express';
 import multer from 'multer';
-import { adminLogin, protectAdmin,} from '../middlewares/adminMiddleware';
-import { getUsers, setUserStatus, getAppeals, reviewAppeal,} from '../controllers/admin/AdminController';
+import { adminLogin, protectAdmin} from '../middlewares/adminMiddleware';
+import { getUsers, setUserStatus, getAppeals, reviewAppeal} from '../controllers/admin/AdminController';
 import { SubmitAppealUseCase } from '../../use-cases/auth/SubmitAppealUseCase';
 import userRepo from '../../infrastructure/repositories/MongoUserRepository';
 import appealRepo from '../../infrastructure/repositories/MongoAppealRepository';
@@ -38,7 +38,7 @@ router.patch('/appeals/:appealId/review', protectAdmin, reviewAppeal);
 const appealHandler =( type: | 'suspension' | 'ban') =>
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {  userId,  explanation,} = req.body;
+      const {userId,  explanation} = req.body;
       if (!userId?.trim()) {
         return badRequest(   res, 'User ID is required' );
       }
@@ -50,7 +50,7 @@ const appealHandler =( type: | 'suspension' | 'ban') =>
       const appeal =
         await submitAppealUseCase.execute({ userId, type,explanation, files: (
               req.files as Express.Multer.File[] ) || [],
-          io: req.app.locals.io,
+              io: req.app.locals.io,
         });
 
       return res.status(201).json({ success: true, data: appeal, });
@@ -66,10 +66,7 @@ router.post('/appeals/ban',upload.array('evidence', 5),appealHandler('ban'));
 router.get( '/appeals/user/:userId',
   async ( req: Request, res: Response, next: NextFunction) => {
     try {
-      const appeals =
-        await appealRepo.findByUserId(
-          req.params.userId
-        );
+      const appeals = await appealRepo.findByUserId( req.params.userId );
 
       return res.json({
         success: true,

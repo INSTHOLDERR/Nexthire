@@ -1,8 +1,4 @@
-import {
-  IAppeal,
-  AppealStatus,
-  AppealType,
-} from "../entities/appeal.types";
+import {IAppeal, AppealStatus, AppealType} from "../entities/appeal.types";
 
 export interface IAppealRepository {
   create(data: Partial<IAppeal>): Promise<IAppeal>;

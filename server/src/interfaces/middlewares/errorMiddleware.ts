@@ -20,13 +20,8 @@ export const notFound = ( req: Request, res: Response): void => {
 
 export const errorHandler = ( err: Error | AppError, _req: Request, res: Response, _next: NextFunction): void => {
   const appErr = err as AppError;
-
-  const statusCode =
-    appErr.status || 500;
-
-  const user =
-    appErr.user as ErrorUser | undefined;
-
+ const statusCode = appErr.status || 500;
+  const user =appErr.user as ErrorUser | undefined;
   let data;
 
   switch (appErr.code) {
@@ -35,12 +30,9 @@ export const errorHandler = ( err: Error | AppError, _req: Request, res: Respons
         data = {
           userId: String(user._id),
           email: user.email,
-          suspensionReason:
-            user.suspensionReason,
-          suspendedAt:
-            user.suspendedAt,
-          suspendedUntil:
-            user.suspendedUntil,
+          suspensionReason: user.suspensionReason,
+          suspendedAt: user.suspendedAt,
+          suspendedUntil:  user.suspendedUntil,
         };
       }
       break;
@@ -50,10 +42,8 @@ export const errorHandler = ( err: Error | AppError, _req: Request, res: Respons
         data = {
           userId: String(user._id),
           email: user.email,
-          banReason:
-            user.banReason,
-          bannedAt:
-            user.bannedAt,
+          banReason:  user.banReason,
+          bannedAt: user.bannedAt,
         };
       }
       break;
@@ -61,11 +51,8 @@ export const errorHandler = ( err: Error | AppError, _req: Request, res: Respons
 
   res.status(statusCode).json({
     success: false,
-    message:
-      err.message ||
-      'Internal Server Error',
-    code:
-      appErr.code || null,
+    message: err.message || 'Internal Server Error',
+    code:appErr.code || null,
     data,
   });
 };

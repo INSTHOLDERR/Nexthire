@@ -1,10 +1,5 @@
 import { IAppealRepository } from '../../domain/repositories/appeal.repository';
-import {
-  IAppeal,
-  AppealStatus,
-  AppealType,
-} from '../../domain/entities/appeal.types';
-
+import {IAppeal, AppealStatus, AppealType} from '../../domain/entities/appeal.types';
 import { AppealModel } from '../database/models/AppealModel';
 
 export class MongoAppealRepository
@@ -121,8 +116,7 @@ export class MongoAppealRepository
     id: string,
     status: AppealStatus
   ): Promise<IAppeal | null> {
-    const appeal =
-      await AppealModel.findByIdAndUpdate(
+    const appeal = await AppealModel.findByIdAndUpdate(
         id,
         { status },
         { new: true }

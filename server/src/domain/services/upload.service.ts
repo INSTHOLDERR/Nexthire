@@ -1,4 +1,3 @@
-
 export interface IUploadService {
   uploadImage(
     buffer: Buffer,

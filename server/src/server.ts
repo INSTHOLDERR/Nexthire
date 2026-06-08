@@ -36,6 +36,6 @@ connectDB().then(() => {
     console.log(`🔌 Socket.io ready`);
   });
 
-  process.on('SIGTERM', () => httpServer.close(() => process.exit(0)));
-  process.on('SIGINT',  () => httpServer.close(() => process.exit(0)));
+  process.on('SIGTERM',() => httpServer.close(() => process.exit(0)));
+  process.on('SIGINT',() => httpServer.close(() => process.exit(0)));
 });

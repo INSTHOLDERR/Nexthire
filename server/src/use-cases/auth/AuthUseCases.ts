@@ -6,7 +6,7 @@ import { IGoogleAuthService } from '../../domain/services/google-auth.service';
 import { IEmailService } from '../../domain/services/email.service';
 import { ITokenService } from '../../domain/services/token.service';
 
-// ─── AppError helper ──────────────────────────────────────────────────────────
+// AppError helper 
 export class AppError extends Error {
   constructor(
     public readonly status: number,
@@ -18,7 +18,7 @@ export class AppError extends Error {
   }
 }
 
-// ─── RegisterUseCase ──────────────────────────────────────────────────────────
+// RegisterUseCase
 export class RegisterUseCase {
   constructor(
     private readonly userRepo: IUserRepository,
@@ -29,7 +29,7 @@ export class RegisterUseCase {
   async execute({ email, password }: { email: string; password: string }) {
     const existing = await this.userRepo.findByEmail(email);
     if (existing) {
-      if (existing.status === 'banned')    throw new AppError(403, 'Account banned.',    'BANNED',    existing);
+      if (existing.status === 'banned')    throw new AppError(403, 'Account banned.', 'BANNED', existing);
       if (existing.status === 'suspended') throw new AppError(403, 'Account suspended.', 'SUSPENDED', existing);
       throw new AppError(409, 'Email already exists.', 'EMAIL_EXISTS');
     }
@@ -40,7 +40,7 @@ export class RegisterUseCase {
   }
 }
 
-// ─── VerifyOTPUseCase ─────────────────────────────────────────────────────────
+// VerifyOTPUseCase 
 export class VerifyOTPUseCase {
   constructor(
     private readonly userRepo: IUserRepository,
@@ -61,8 +61,8 @@ export class VerifyOTPUseCase {
           throw new AppError(400, 'Registration data expired. Please register again.');
         user = await this.userRepo.createWithHashedPassword({
           email,
-          password:        record.pendingPassword,
-          authProvider:    'email',
+          password:  record.pendingPassword,
+          authProvider: 'email',
           isEmailVerified: true,
         });
       } else {
@@ -89,7 +89,7 @@ export class VerifyOTPUseCase {
   }
 }
 
-// ─── LoginUseCase ─────────────────────────────────────────────────────────────
+// LoginUseCase 
 export class LoginUseCase {
   constructor(
     private readonly userRepo: IUserRepository,
@@ -104,7 +104,7 @@ export class LoginUseCase {
     if (user.authProvider === 'google' && !user.password)
       throw new AppError(400, 'This account was created with Google. Use "Forgot password" to set a password first.', 'GOOGLE_ONLY');
 
-    if (user.status === 'banned')    throw new AppError(403, 'Account banned.',    'BANNED',    user);
+    if (user.status === 'banned')  throw new AppError(403, 'Account banned.', 'BANNED',    user);
     if (user.status === 'suspended') throw new AppError(403, 'Account suspended.', 'SUSPENDED', user);
 
     if (!user.password) throw new AppError(400, 'No password set. Use "Forgot password" to create one.', 'NO_PASSWORD');
@@ -121,7 +121,7 @@ export class LoginUseCase {
   }
 }
 
-// ─── GoogleAuthUseCase ────────────────────────────────────────────────────────
+// GoogleAuthUseCase
 export class GoogleAuthUseCase {
   constructor(
     private readonly userRepo: IUserRepository,
@@ -146,11 +146,13 @@ export class GoogleAuthUseCase {
     }
 
     const token = this.tokenService.generate(user._id);
-    return { token, user: { id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, profilePicture: user.profilePicture, onboardingComplete: user.onboardingComplete } };
+    return { token, user: {
+       id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, profilePicture: user.profilePicture, onboardingComplete: user.onboardingComplete 
+      } };
   }
 }
 
-// ─── ForgotPasswordUseCase ────────────────────────────────────────────────────
+// ForgotPasswordUseCase 
 export class ForgotPasswordUseCase {
   constructor(
     private readonly userRepo: IUserRepository,
@@ -168,7 +170,7 @@ export class ForgotPasswordUseCase {
   }
 }
 
-// ─── ResetPasswordUseCase ─────────────────────────────────────────────────────
+// ResetPasswordUseCase
 export class ResetPasswordUseCase {
   constructor(private readonly userRepo: IUserRepository) {}
 

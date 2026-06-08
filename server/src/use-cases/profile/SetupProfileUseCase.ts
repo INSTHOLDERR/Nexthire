@@ -20,7 +20,7 @@ export class SetupProfileUseCase {
     const { existingProfilePicture, ...rest } = data;
     const update: Record<string, unknown> = {};
 
-    // Copy fields, casting booleans properly
+    
     for (const [key, value] of Object.entries(rest)) {
       if ((BOOLEAN_FIELDS as readonly string[]).includes(key)) {
         update[key] = value === 'true';
@@ -33,10 +33,9 @@ export class SetupProfileUseCase {
       // New file uploaded — upload to Cloudinary
       update.profilePicture = await this.uploadService.uploadImage(file.buffer, 'profiles');
     } else if (existingProfilePicture) {
-      // No new file — preserve existing picture (e.g. from Google)
+      // No new file — preserve existing picture google pic will exists
       update.profilePicture = existingProfilePicture;
     }
-
     return this.userRepo.update(userId, update as any);
   }
 }

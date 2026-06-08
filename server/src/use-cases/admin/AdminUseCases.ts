@@ -5,14 +5,12 @@ import { AppError } from '../auth/AuthUseCases';
 import { UserModel } from '../../infrastructure/database/models/UserModel';
 import { Server } from 'socket.io';
 
-// ─── GetUsersUseCase ──────────────────────────────────────────────────────────
+// GetUsersUseCase
 interface GetUsersInput { page?: number; limit?: number; search?: string }
 
 export class GetUsersUseCase {
   async execute({ page = 1, limit = 20, search = '' }: GetUsersInput) {
-    const query = search
-      ? { $or: [{ email: { $regex: search, $options: 'i' } }, { firstName: { $regex: search, $options: 'i' } }] }
-      : {};
+    const query = search ? { $or: [{ email: { $regex: search, $options: 'i' } }, { firstName: { $regex: search, $options: 'i' } }] }: {};
     const total = await UserModel.countDocuments(query);
     const users = await UserModel.find(query)
       .select('email firstName lastName profilePicture status suspensionReason suspendedAt suspendedUntil banReason bannedAt createdAt')
@@ -23,7 +21,7 @@ export class GetUsersUseCase {
   }
 }
 
-// ─── SetUserStatusUseCase ─────────────────────────────────────────────────────
+// SetUserStatusUseCase 
 interface SetUserStatusInput {
   userId: string;
   action: 'ban' | 'suspend' | 'activate';
@@ -58,11 +56,11 @@ export class SetUserStatusUseCase {
 
     if (io) {
       if (action === 'ban') {
-        io.to(`user:${userId}`).emit('account_status_changed', { code: 'BANNED', data: { banReason: update.banReason, bannedAt: update.bannedAt } });
+        io.to(`user:${userId}`).emit('account_status_changed',{code:'BANNED',data:{ banReason: update.banReason,bannedAt: update.bannedAt } });
       } else if (action === 'suspend') {
-        io.to(`user:${userId}`).emit('account_status_changed', { code: 'SUSPENDED', data: { userId: String(user._id), suspensionReason: update.suspensionReason, suspendedAt: update.suspendedAt, suspendedUntil: update.suspendedUntil } });
+        io.to(`user:${userId}`).emit('account_status_changed',{code:'SUSPENDED',data:{ userId: String(user._id), suspensionReason: update.suspensionReason, suspendedAt: update.suspendedAt, suspendedUntil: update.suspendedUntil } });
       } else if (action === 'activate') {
-        io.to(`user:${userId}`).emit('account_status_changed', { code: 'ACTIVE' });
+        io.to(`user:${userId}`).emit('account_status_changed',{code:'ACTIVE' });
       }
       io.to('admin').emit('user_status_changed', { userId: String(user._id), status: user.status });
     }
@@ -88,9 +86,8 @@ export class SetUserStatusUseCase {
   }
 }
 
-// ─── GetAppealsUseCase ────────────────────────────────────────────────────────
+// GetAppealsUseCase
 export class GetAppealsUseCase {
   constructor(private readonly appealRepo: IAppealRepository) {}
-
   execute() { return this.appealRepo.findAll(); }
 }

@@ -1,8 +1,5 @@
 import admin from "../config/firebase";
-import {
-  IGoogleAuthService,
-  GoogleTokenPayload,
-} from "../../domain/services/google-auth.service";
+import { IGoogleAuthService, GoogleTokenPayload} from "../../domain/services/google-auth.service";
 
 export class FirebaseAuthService
   implements IGoogleAuthService
