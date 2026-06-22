@@ -1,59 +1,31 @@
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from '../../use-cases/auth/AuthUseCases';
+import { AppError } from '../../shared/errors/AppError';
+import { ErrorCode } from '../../shared/errors/error-codes';
 
-interface ErrorUser {
-  _id: string;
-  email: string;
-  suspensionReason?: string;
-  suspendedAt?: Date;
-  suspendedUntil?: Date;
-  banReason?: string;
-  bannedAt?: Date;
-}
-
-export const notFound = ( req: Request, res: Response): void => {
+export const notFound = (req: Request, res: Response): void => {
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`,
+    code: ErrorCode.NOT_FOUND,
   });
 };
 
-export const errorHandler = ( err: Error | AppError, _req: Request, res: Response, _next: NextFunction): void => {
-  const appErr = err as AppError;
- const statusCode = appErr.status || 500;
-  const user =appErr.user as ErrorUser | undefined;
-  let data;
-
-  switch (appErr.code) {
-    case 'SUSPENDED':
-      if (user) {
-        data = {
-          userId: String(user._id),
-          email: user.email,
-          suspensionReason: user.suspensionReason,
-          suspendedAt: user.suspendedAt,
-          suspendedUntil:  user.suspendedUntil,
-        };
-      }
-      break;
-
-    case 'BANNED':
-      if (user) {
-        data = {
-          userId: String(user._id),
-          email: user.email,
-          banReason:  user.banReason,
-          bannedAt: user.bannedAt,
-        };
-      }
-      break;
+export const errorHandler = (
+  err: Error | AppError,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+): void => {
+  if (err instanceof AppError) {
+    res.status(err.status).json({ success: false, message: err.message, code: err.code, data: err.data });
+    return;
   }
 
-  res.status(statusCode).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-    code:appErr.code || null,
-    data,
-  });
-};
+  if ((err as any).code === 11000) {
+    res.status(409).json({ success: false, message: 'Duplicate entry.', code: ErrorCode.EMAIL_EXISTS });
+    return;
+  }
 
+  console.error('[Unhandled Error]', err);
+  res.status(500).json({ success: false, message: 'Internal server error', code: ErrorCode.INTERNAL_ERROR });
+};

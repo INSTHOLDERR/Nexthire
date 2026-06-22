@@ -1,27 +1,17 @@
-import { IOTP } from "../entities/otp.types";
+import { IOTPSession, OTPSessionType } from '../entities/otp.types';
+
 
 export interface IOTPRepository {
-  create(
+  createOrReset(email: string, otp: string, type: OTPSessionType): Promise<IOTPSession>;
+
+  createOrResetPendingRegistration(
     email: string,
     otp: string,
-    type: IOTP["type"]
-  ): Promise<IOTP>;
+    hashedPassword: string
+  ): Promise<IOTPSession>;
 
-  createPendingRegistration(
-    email: string,
-    otp: string,
-    plaintextPassword: string
-  ): Promise<IOTP>;
-
-  findValid(
-    email: string,
-    otp: string,
-    type: IOTP["type"]
-  ): Promise<IOTP | null>;
-
-  findPendingRegistration(
-    email: string
-  ): Promise<IOTP | null>;
-
+  findActiveSession(email: string, type: OTPSessionType): Promise<IOTPSession | null>;
+  findPendingRegistration(email: string): Promise<IOTPSession | null>;
   markUsed(id: string): Promise<void>;
+  incrementAttempts(id: string): Promise<IOTPSession | null>;
 }

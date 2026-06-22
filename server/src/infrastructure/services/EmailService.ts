@@ -1,16 +1,13 @@
-
-import { IEmailService, SuspensionEmailData, BanEmailData,AppealMessageEmailData} from '../../domain/services/email.service';
+import { IEmailService, SuspensionEmailData, BanEmailData, AppealMessageEmailData } from '../../domain/services/email.service';
 import { transporter } from '../config/mail';
-
-
 
 export class EmailService implements IEmailService {
   private from = `"NextHire" <${process.env.EMAIL_USER}>`;
 
   async sendOTP(email: string, otp: string, type: string): Promise<void> {
     const isVerify = type === 'email_verify';
-    const isLogin  = type === 'login_verify';
-    const subject  = isVerify
+    const isLogin = type === 'login_verify';
+    const subject = isVerify
       ? 'Verify your NextHire email'
       : isLogin
       ? 'Your NextHire login code'
@@ -18,11 +15,9 @@ export class EmailService implements IEmailService {
 
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:auto;padding:32px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;">
-        <div style="margin-bottom:24px;">
-          <span style="font-size:18px;font-weight:700;color:#0f172a;">NextHire</span>
-        </div>
+        <div style="margin-bottom:24px;"><span style="font-size:18px;font-weight:700;color:#0f172a;">NextHire</span></div>
         <h2 style="color:#0f172a;margin-bottom:8px;font-size:18px;font-weight:600;">${isVerify ? 'Verify your email' : isLogin ? 'Login verification code' : 'Password reset code'}</h2>
-        <p style="color:#64748b;font-size:14px;margin-bottom:24px;">Use the code below. It expires in <strong>10 minutes</strong>.</p>
+        <p style="color:#64748b;font-size:14px;margin-bottom:24px;">Use the code below. It expires in <strong>3 minutes</strong>.</p>
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:28px;text-align:center;letter-spacing:14px;font-size:34px;font-weight:700;color:#0f172a;">${otp}</div>
         <p style="color:#94a3b8;font-size:12px;margin-top:24px;text-align:center;">Do not share this code with anyone.</p>
       </div>
@@ -66,7 +61,7 @@ export class EmailService implements IEmailService {
             <tr><td colspan="2" style="padding-top:12px;"><p style="color:#94a3b8;font-size:12px;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Reason</p><p style="color:#0f172a;margin:0;font-size:14px;">${reason || 'Severe violation of community guidelines'}</p></td></tr>
           </table>
         </div>
-        <p style="color:#64748b;font-size:13px;line-height:1.6;">If you believe this is an error, you may contact our admin team at <a href="mailto:nexthireadmin@gmail.com" style="color:#0f172a;font-weight:600;">nexthireadmin@gmail.com</a></p>
+        <p style="color:#64748b;font-size:13px;line-height:1.6;">If you believe this is an error, you may contact our admin team.</p>
         <p style="color:#94a3b8;font-size:12px;margin-top:24px;">— The NextHire Team</p>
       </div>
     `;
@@ -85,19 +80,8 @@ export class EmailService implements IEmailService {
         <p style="color:#94a3b8;font-size:12px;margin-top:16px;">— The NextHire Team</p>
       </div>
     `;
-    await transporter.sendMail({
-      from: this.from,
-      to: email,
-      subject: `NextHire: Message about your ${typeLabel}`,
-      html,
-    });
+    await transporter.sendMail({ from: this.from, to: email, subject: `NextHire: Message about your ${typeLabel}`, html });
   }
 }
 
-// Named exports for backward compatibility
-const emailService = new EmailService();
-export const sendOTPEmail          = emailService.sendOTP.bind(emailService);
-export const sendSuspensionEmail   = emailService.sendSuspension.bind(emailService);
-export const sendBanEmail          = emailService.sendBan.bind(emailService);
-export const sendAppealMessageEmail = emailService.sendAppealMessage.bind(emailService);
-export default emailService;
+export default new EmailService();

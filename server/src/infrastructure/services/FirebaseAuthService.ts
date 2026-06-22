@@ -1,19 +1,13 @@
-import admin from "../config/firebase";
-import { IGoogleAuthService, GoogleTokenPayload} from "../../domain/services/google-auth.service";
+import { getFirebaseAdmin } from '../config/firebase';
+import { IGoogleAuthService, GoogleTokenPayload } from '../../domain/services/google-auth.service';
 
-export class FirebaseAuthService
-  implements IGoogleAuthService
-{
-  async verifyIdToken(
-    idToken: string
-  ): Promise<GoogleTokenPayload> {
-    const decoded = await admin
-      .auth()
-      .verifyIdToken(idToken);
-
+export class FirebaseAuthService implements IGoogleAuthService {
+  async verifyIdToken(idToken: string): Promise<GoogleTokenPayload> {
+    const admin = getFirebaseAdmin();
+    const decoded = await admin.auth().verifyIdToken(idToken);
     return {
       uid: decoded.uid,
-      email: decoded.email ?? "",
+      email: decoded.email ?? '',
       name: decoded.name,
       picture: decoded.picture,
     };

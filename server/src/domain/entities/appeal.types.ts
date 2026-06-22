@@ -1,7 +1,7 @@
-import { IUser } from "./user.types";
+import { IUser } from './user.types';
 
-export type AppealStatus = "pending" | "approved" | "rejected";
-export type AppealType = "suspension" | "ban";
+export type AppealStatus = 'pending' | 'approved' | 'rejected';
+export type AppealType   = 'suspension' | 'ban';
 
 export interface IAppeal {
   _id: string;

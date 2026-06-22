@@ -1,27 +1,31 @@
 import { IUserRepository } from '../../domain/repositories/user.repository';
 import { IAppealRepository } from '../../domain/repositories/appeal.repository';
+import { IUser } from '../../domain/entities/user.types';
+import { IAppeal } from '../../domain/entities/appeal.types';
 import { IEmailService } from '../../domain/services/email.service';
-import { AppError } from '../auth/AuthUseCases';
-import { UserModel } from '../../infrastructure/database/models/UserModel';
+import { AppError } from '../../shared/errors/AppError';
+import { ErrorCode } from '../../shared/errors/error-codes';
 import { Server } from 'socket.io';
+import { UseCase } from '../UseCase';
 
-// GetUsersUseCase
+// ─── GetUsersUseCase ────────────────────────────────────────────────────────
+
 interface GetUsersInput { page?: number; limit?: number; search?: string }
+interface GetUsersOutput { users: IUser[]; total: number; page: number; pages: number }
 
-export class GetUsersUseCase {
-  async execute({ page = 1, limit = 20, search = '' }: GetUsersInput) {
-    const query = search ? { $or: [{ email: { $regex: search, $options: 'i' } }, { firstName: { $regex: search, $options: 'i' } }] }: {};
-    const total = await UserModel.countDocuments(query);
-    const users = await UserModel.find(query)
-      .select('email firstName lastName profilePicture status suspensionReason suspendedAt suspendedUntil banReason bannedAt createdAt')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
+export class GetUsersUseCase extends UseCase<GetUsersInput, GetUsersOutput> {
+  constructor(private readonly userRepo: IUserRepository) {
+    super();
+  }
+
+  async execute({ page = 1, limit = 20, search = '' }: GetUsersInput): Promise<GetUsersOutput> {
+    const { users, total } = await this.userRepo.findAll({ search, page, limit });
     return { users, total, page, pages: Math.ceil(total / limit) };
   }
 }
 
-// SetUserStatusUseCase 
+// ─── SetUserStatusUseCase ───────────────────────────────────────────────────
+
 interface SetUserStatusInput {
   userId: string;
   action: 'ban' | 'suspend' | 'activate';
@@ -30,13 +34,15 @@ interface SetUserStatusInput {
   io?: Server;
 }
 
-export class SetUserStatusUseCase {
+export class SetUserStatusUseCase extends UseCase<SetUserStatusInput, IUser> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly emailService: IEmailService
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute({ userId, action, reason, suspendDays, io }: SetUserStatusInput) {
+  async execute({ userId, action, reason, suspendDays, io }: SetUserStatusInput): Promise<IUser> {
     let update: Record<string, unknown> = {};
 
     if (action === 'ban') {
@@ -44,23 +50,46 @@ export class SetUserStatusUseCase {
     } else if (action === 'suspend') {
       const until = new Date();
       until.setDate(until.getDate() + (parseInt(String(suspendDays)) || 7));
-      update = { status: 'suspended', suspensionReason: reason || 'Temporary suspension', suspendedAt: new Date(), suspendedUntil: until };
+      update = {
+        status: 'suspended',
+        suspensionReason: reason || 'Temporary suspension',
+        suspendedAt: new Date(),
+        suspendedUntil: until,
+      };
     } else if (action === 'activate') {
-      update = { status: 'active', suspensionReason: null, suspendedAt: null, suspendedUntil: null, banReason: null, bannedAt: null };
+      update = {
+        status: 'active',
+        suspensionReason: null,
+        suspendedAt: null,
+        suspendedUntil: null,
+        banReason: null,
+        bannedAt: null,
+      };
     } else {
-      throw new AppError(400, 'Invalid action');
+      throw AppError.badRequest('Invalid action.', ErrorCode.ADMIN_INVALID_ACTION);
     }
 
     const user = await this.userRepo.update(userId, update as any);
-    if (!user) throw new AppError(404, 'User not found');
+    if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
 
     if (io) {
       if (action === 'ban') {
-        io.to(`user:${userId}`).emit('account_status_changed',{code:'BANNED',data:{ banReason: update.banReason,bannedAt: update.bannedAt } });
+        io.to(`user:${userId}`).emit('account_status_changed', {
+          code: 'BANNED',
+          data: { banReason: update.banReason, bannedAt: update.bannedAt },
+        });
       } else if (action === 'suspend') {
-        io.to(`user:${userId}`).emit('account_status_changed',{code:'SUSPENDED',data:{ userId: String(user._id), suspensionReason: update.suspensionReason, suspendedAt: update.suspendedAt, suspendedUntil: update.suspendedUntil } });
-      } else if (action === 'activate') {
-        io.to(`user:${userId}`).emit('account_status_changed',{code:'ACTIVE' });
+        io.to(`user:${userId}`).emit('account_status_changed', {
+          code: 'SUSPENDED',
+          data: {
+            userId: String(user._id),
+            suspensionReason: update.suspensionReason,
+            suspendedAt: update.suspendedAt,
+            suspendedUntil: update.suspendedUntil,
+          },
+        });
+      } else {
+        io.to(`user:${userId}`).emit('account_status_changed', { code: 'ACTIVE' });
       }
       io.to('admin').emit('user_status_changed', { userId: String(user._id), status: user.status });
     }
@@ -86,8 +115,101 @@ export class SetUserStatusUseCase {
   }
 }
 
-// GetAppealsUseCase
-export class GetAppealsUseCase {
-  constructor(private readonly appealRepo: IAppealRepository) {}
-  execute() { return this.appealRepo.findAll(); }
+// ─── GetAppealsUseCase ──────────────────────────────────────────────────────
+
+export class GetAppealsUseCase extends UseCase<void, IAppeal[]> {
+  constructor(private readonly appealRepo: IAppealRepository) {
+    super();
+  }
+  execute(): Promise<IAppeal[]> {
+    return this.appealRepo.findAll();
+  }
+}
+
+// ─── ReviewAppealUseCase ────────────────────────────────────────────────────
+
+interface ReviewAppealInput {
+  appealId: string;
+  status: 'approved' | 'rejected';
+  adminMsg: string;
+  io?: Server;
+}
+
+export class ReviewAppealUseCase extends UseCase<ReviewAppealInput, IAppeal> {
+  constructor(
+    private readonly appealRepo: IAppealRepository,
+    private readonly setUserStatusUseCase: SetUserStatusUseCase,
+    private readonly emailService: IEmailService
+  ) {
+    super();
+  }
+
+  async execute({ appealId, status, adminMsg, io }: ReviewAppealInput): Promise<IAppeal> {
+    if (!['approved', 'rejected'].includes(status)) {
+      throw AppError.badRequest('Status must be approved or rejected.', ErrorCode.APPEAL_INVALID_STATUS);
+    }
+    if (!adminMsg?.trim()) {
+      throw AppError.badRequest('A message to the user is required.', ErrorCode.VALIDATION_ERROR);
+    }
+
+    const appeal = await this.appealRepo.updateStatus(appealId, status);
+    if (!appeal) throw AppError.notFound('Appeal not found.', ErrorCode.APPEAL_NOT_FOUND);
+
+    const appealUser = appeal.userId as { _id: string; email: string; firstName?: string; lastName?: string };
+
+    if (status === 'approved' && appealUser) {
+      await this.setUserStatusUseCase.execute({
+        userId: appealUser._id,
+        action: 'activate',
+        reason: 'Appeal approved',
+        io,
+      });
+    }
+
+    const userName = appealUser?.firstName
+      ? `${appealUser.firstName} ${appealUser.lastName || ''}`.trim()
+      : null;
+
+    try {
+      await this.emailService.sendAppealMessage(appealUser.email, {
+        userName,
+        message: adminMsg.trim(),
+        appealType: appeal.type,
+        appealStatus: status,
+      });
+    } catch (emailErr) {
+      console.warn('⚠️ Appeal email failed:', (emailErr as Error).message);
+    }
+
+    if (io && appealUser?._id) {
+      io.to(`user:${appealUser._id}`).emit('appeal_reviewed', {
+        appealId: appeal._id,
+        status,
+        adminMsg: adminMsg.trim(),
+        appealType: appeal.type,
+      });
+      io.to('admin').emit('appeal_updated', { appealId: appeal._id, status });
+    }
+
+    return appeal;
+  }
+}
+
+// ─── AdminLoginUseCase ──────────────────────────────────────────────────────
+
+
+interface AdminLoginInput { email: string; password: string }
+interface AdminLoginOutput { email: string }
+
+export class AdminLoginUseCase extends UseCase<AdminLoginInput, AdminLoginOutput> {
+  async execute({ email, password }: AdminLoginInput): Promise<AdminLoginOutput> {
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL as string;
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD as string;
+
+    if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+      throw AppError.unauthorized('Invalid admin credentials.', ErrorCode.ADMIN_INVALID_CREDENTIALS);
+    }
+
+    return { email };
+  }
 }

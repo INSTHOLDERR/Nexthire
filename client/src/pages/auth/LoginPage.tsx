@@ -29,7 +29,7 @@ export default function LoginPage() {
       await login({ email, password });
       setPendingEmail(email);
       toast.success('OTP sent to your email!');
-      navigate('/verify-otp?type=login_verify');
+      navigate('/verify-otp?type=login_verify', { state: { password } });
     } catch (err) {
       const res = (err as AxiosError<ApiErrorData>).response?.data;
       if (res?.code === 'EMAIL_NOT_FOUND') return setNoAccountBanner('not_found');

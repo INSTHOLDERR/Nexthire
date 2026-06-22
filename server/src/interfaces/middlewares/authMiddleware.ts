@@ -1,38 +1,31 @@
 import { Request, Response, NextFunction } from 'express';
-
 import jwtService from '../../infrastructure/services/JWTService';
 import userRepo from '../../infrastructure/repositories/MongoUserRepository';
+import { ErrorCode } from '../../shared/errors/error-codes';
 
 export const protect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const authHeader =
-    req.headers.authorization;
+  const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({
-      success: false,
-      message: 'Not authorized',
-    });
+    res.status(401).json({ success: false, message: 'Not authorized.', code: ErrorCode.UNAUTHORIZED });
     return;
   }
 
   try {
-    const token =  authHeader.split(' ')[1];
+    const token = authHeader.split(' ')[1];
     const decoded = jwtService.verify(token);
-    const user =await userRepo.findById( decoded.id );
+    const user = await userRepo.findById(decoded.id);
 
     if (!user) {
-      res.status(401).json({
-        success: false,
-        message: 'User not found',
-      });
+      res.status(401).json({ success: false, message: 'User not found.', code: ErrorCode.USER_NOT_FOUND });
       return;
     }
 
     if (user.status === 'banned') {
       res.status(403).json({
         success: false,
-        code: 'BANNED',
-        message:'Your account has been permanently banned.',
+        code: ErrorCode.ACCOUNT_BANNED,
+        message: 'Your account has been permanently banned.',
         data: {
           userId: String(user._id),
           email: user.email,
@@ -43,34 +36,25 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    if ( user.status === 'suspended' ) {
+    if (user.status === 'suspended') {
       res.status(403).json({
         success: false,
-        code: 'SUSPENDED',
+        code: ErrorCode.ACCOUNT_SUSPENDED,
         message: 'Your account has been suspended.',
         data: {
-          userId: String(
-            user._id
-          ),
+          userId: String(user._id),
           email: user.email,
           suspensionReason: user.suspensionReason,
           suspendedAt: user.suspendedAt,
           suspendedUntil: user.suspendedUntil,
         },
       });
-
       return;
     }
 
-    req.user = {...user, id: String(user._id),};
-
+    req.user = { ...user, id: String(user._id) };
     next();
   } catch {
-    res.status(401).json({
-      success: false,
-      message: 'Token invalid or expired',
-    });
+    res.status(401).json({ success: false, message: 'Token invalid or expired.', code: ErrorCode.TOKEN_INVALID });
   }
 };
-
-

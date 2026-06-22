@@ -17,24 +17,8 @@ export interface AppealMessageEmailData {
 }
 
 export interface IEmailService {
-  sendOTP(
-    email: string,
-    otp: string,
-    type: string
-  ): Promise<void>;
-
-  sendSuspension(
-    email: string,
-    data: SuspensionEmailData
-  ): Promise<void>;
-
-  sendBan(
-    email: string,
-    data: BanEmailData
-  ): Promise<void>;
-
-  sendAppealMessage(
-    email: string,
-    data: AppealMessageEmailData
-  ): Promise<void>;
+  sendOTP(email: string, otp: string, type: string): Promise<void>;
+  sendSuspension(email: string, data: SuspensionEmailData): Promise<void>;
+  sendBan(email: string, data: BanEmailData): Promise<void>;
+  sendAppealMessage(email: string, data: AppealMessageEmailData): Promise<void>;
 }

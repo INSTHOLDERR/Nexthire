@@ -20,10 +20,9 @@ export default function BannedPage() {
   const { state }  = useLocation();
   const navigate   = useNavigate();
   const { user, logout } = useAuth();
-  const userId = user?.id ?? user?._id;
-
   const ssState   = readSessionState<BannedState>('nh_banned_state');
   const pageState = (state ?? ssState ?? {}) as BannedState;
+  const userId = user?.id ?? pageState?.userId;
 
   const bannedAt = pageState?.bannedAt
     ? new Date(pageState.bannedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })

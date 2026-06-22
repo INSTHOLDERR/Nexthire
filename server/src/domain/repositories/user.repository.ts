@@ -1,4 +1,4 @@
-import { IUser } from "../entities/user.types";
+import { IUser } from '../entities/user.types';
 
 export interface IUserRepository {
   findByEmail(email: string): Promise<IUser | null>;
@@ -9,4 +9,9 @@ export interface IUserRepository {
   createWithHashedPassword(data: Partial<IUser>): Promise<IUser>;
 
   update(id: string, data: Partial<IUser>): Promise<IUser | null>;
+
+  findAll(filter: { search?: string; page: number; limit: number }): Promise<{
+    users: IUser[];
+    total: number;
+  }>;
 }

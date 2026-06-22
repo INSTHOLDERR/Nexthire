@@ -37,7 +37,7 @@ export default function SuspendedPage() {
 
   const ssState = readSessionState<SuspendedState>('nh_suspended_state');
   const pageState = (state ?? ssState ?? {}) as SuspendedState;
-  const userId = user?.id ?? user?._id ?? pageState?.userId;
+  const userId = user?.id ?? pageState?.userId;
 
   const fmt = (d?: string | Date) =>
     d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A';

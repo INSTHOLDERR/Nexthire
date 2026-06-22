@@ -1,8 +1,11 @@
 import { IUserRepository } from '../../domain/repositories/user.repository';
-import {  IAppealRepository } from '../../domain/repositories/appeal.repository';
+import { IAppealRepository } from '../../domain/repositories/appeal.repository';
+import { IAppeal } from '../../domain/entities/appeal.types';
 import { IUploadService } from '../../domain/services/upload.service';
-import { AppError } from './AuthUseCases';
+import { AppError } from '../../shared/errors/AppError';
+import { ErrorCode } from '../../shared/errors/error-codes';
 import { Server } from 'socket.io';
+import { UseCase } from '../UseCase';
 
 interface SubmitAppealInput {
   userId: string;
@@ -12,20 +15,33 @@ interface SubmitAppealInput {
   io?: Server;
 }
 
-export class SubmitAppealUseCase {
+export class SubmitAppealUseCase extends UseCase<SubmitAppealInput, IAppeal> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly appealRepo: IAppealRepository,
     private readonly uploadService: IUploadService
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute({ userId, type, explanation, files, io }: SubmitAppealInput) {
+  async execute({ userId, type, explanation, files, io }: SubmitAppealInput): Promise<IAppeal> {
     const user = await this.userRepo.findById(userId);
-    if (!user) throw new AppError(404, 'User not found.');
+    if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
+
+    if (type === 'ban' && user.status !== 'banned') {
+      throw AppError.badRequest('This account is not currently banned.', ErrorCode.APPEAL_NOT_ALLOWED);
+    }
+    if (type === 'suspension' && user.status !== 'suspended') {
+      throw AppError.badRequest('This account is not currently suspended.', ErrorCode.APPEAL_NOT_ALLOWED);
+    }
 
     const existing = await this.appealRepo.findPending(userId, type);
-    if (existing)
-      throw new AppError(409, 'You already have a pending appeal. Please wait for admin review.');
+    if (existing) {
+      throw AppError.conflict(
+        'You already have a pending appeal. Please wait for admin review.',
+        ErrorCode.APPEAL_ALREADY_PENDING
+      );
+    }
 
     const evidence: string[] = [];
     for (const file of files ?? []) {

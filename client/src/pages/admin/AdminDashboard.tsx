@@ -29,7 +29,7 @@ interface AppealPanelProps {
 
 function AppealPanel({ appeal, onClose, onReviewed }: AppealPanelProps) {
   const [msg,      setMsg]      = useState('');
-  const [acting,   setActing]   = useState<AppealStatus | ''>('');
+  const [acting,   setActing]   = useState<'approved' | 'rejected' | ''>('');
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const user      = appeal.userId;
@@ -37,7 +37,7 @@ function AppealPanel({ appeal, onClose, onReviewed }: AppealPanelProps) {
   const fmt       = (d?: string) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
   const isPending = appeal.status === 'pending';
 
-  const handleDecision = async (status: AppealStatus) => {
+  const handleDecision = async (status: 'approved' | 'rejected') => {
     if (!msg.trim()) return toast.error('Please write a message to the user first');
     setActing(status);
     try {

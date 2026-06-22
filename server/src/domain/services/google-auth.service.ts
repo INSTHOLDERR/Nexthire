@@ -4,8 +4,7 @@ export interface GoogleTokenPayload {
   name?: string;
   picture?: string;
 }
+
 export interface IGoogleAuthService {
-  verifyIdToken(
-    idToken: string
-  ): Promise<GoogleTokenPayload>;
+  verifyIdToken(idToken: string): Promise<GoogleTokenPayload>;
 }

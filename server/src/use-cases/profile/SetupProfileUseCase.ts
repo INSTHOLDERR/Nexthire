@@ -1,5 +1,9 @@
 import { IUserRepository } from '../../domain/repositories/user.repository';
 import { IUploadService } from '../../domain/services/upload.service';
+import { IUser } from '../../domain/entities/user.types';
+import { AppError } from '../../shared/errors/AppError';
+import { ErrorCode } from '../../shared/errors/error-codes';
+import { UseCase } from '../UseCase';
 
 interface SetupProfileInput {
   userId: string;
@@ -7,35 +11,33 @@ interface SetupProfileInput {
   file?: Express.Multer.File;
 }
 
-// Fields that are Boolean in the Mongoose schema — must be cast from FormData strings
-const BOOLEAN_FIELDS = ['onboardingComplete', 'openToWork', 'isHiring'] as const;
+const BOOLEAN_FIELDS = ['onboardingComplete'] as const;
 
-export class SetupProfileUseCase {
+export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly uploadService: IUploadService
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute({ userId, data, file }: SetupProfileInput) {
+  async execute({ userId, data, file }: SetupProfileInput): Promise<IUser> {
     const { existingProfilePicture, ...rest } = data;
     const update: Record<string, unknown> = {};
 
-    
     for (const [key, value] of Object.entries(rest)) {
-      if ((BOOLEAN_FIELDS as readonly string[]).includes(key)) {
-        update[key] = value === 'true';
-      } else {
-        update[key] = value;
-      }
+      update[key] = (BOOLEAN_FIELDS as readonly string[]).includes(key) ? value === 'true' : value;
     }
 
     if (file) {
-      // New file uploaded — upload to Cloudinary
       update.profilePicture = await this.uploadService.uploadImage(file.buffer, 'profiles');
     } else if (existingProfilePicture) {
-      // No new file — preserve existing picture google pic will exists
       update.profilePicture = existingProfilePicture;
     }
-    return this.userRepo.update(userId, update as any);
+
+    const user = await this.userRepo.update(userId, update as any);
+    if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
+
+    return user;
   }
 }
