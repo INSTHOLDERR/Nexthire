@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import type { ReactNode } from 'react';
+import { UserStatus } from '../types';
 
 import RegisterPage       from '../pages/auth/RegisterPage';
 import LoginPage          from '../pages/auth/LoginPage';
@@ -19,25 +20,25 @@ import AdminDashboard     from '../pages/admin/AdminDashboard';
 const Private = ({ children }: { children: ReactNode }) => {
   const { token, user } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.status === 'banned')    return <Navigate to="/banned"    replace />;
-  if (user?.status === 'suspended') return <Navigate to="/suspended" replace />;
+  if (user?.status === UserStatus.BANNED)    return <Navigate to="/banned"    replace />;
+  if (user?.status === UserStatus.SUSPENDED) return <Navigate to="/suspended" replace />;
   return <>{children}</>;
 };
 
 const OnboardingRoute = ({ children }: { children: ReactNode }) => {
   const { token, user } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.status === 'banned')    return <Navigate to="/banned"    replace />;
-  if (user?.status === 'suspended') return <Navigate to="/suspended" replace />;
-  if (user?.onboardingComplete)     return <Navigate to="/"          replace />;
+  if (user?.status === UserStatus.BANNED)    return <Navigate to="/banned"    replace />;
+  if (user?.status === UserStatus.SUSPENDED) return <Navigate to="/suspended" replace />;
+  if (user?.onboardingComplete)              return <Navigate to="/"          replace />;
   return <>{children}</>;
 };
 
 const Public = ({ children }: { children: ReactNode }) => {
   const { token, user, authMethod } = useAuth();
   if (!token) return <>{children}</>;
-  if (user?.status === 'banned')    return <Navigate to="/banned"    replace />;
-  if (user?.status === 'suspended') return <Navigate to="/suspended" replace />;
+  if (user?.status === UserStatus.BANNED)    return <Navigate to="/banned"    replace />;
+  if (user?.status === UserStatus.SUSPENDED) return <Navigate to="/suspended" replace />;
   if (authMethod === 'google' && !user?.onboardingComplete)
     return <Navigate to="/onboarding/profile" replace />;
   return <Navigate to="/" replace />;

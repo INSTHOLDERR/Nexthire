@@ -1,7 +1,11 @@
 // ─── Auth / User ──────────────────────────────────────────────────────────────
 export type AuthProvider = 'email' | 'google';
 export type UserRole     = 'jobseeker' | 'student';
-export type UserStatus   = 'active' | 'suspended' | 'banned';
+export enum UserStatus {
+  ACTIVE    = 'active',
+  SUSPENDED = 'suspended',
+  BANNED    = 'banned',
+}
 
 export interface AuthUser {
   id: string;

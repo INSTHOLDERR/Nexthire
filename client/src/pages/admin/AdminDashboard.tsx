@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { getSocket } from '../../hooks/useSocket';
 import { getUsers, setStatus, getAppeals, reviewAppeal } from '../../services/adminService';
-import { AdminUser, AdminAppeal, AdminAction, AppealStatus } from '../../types';
+import { AdminUser, AdminAppeal, AdminAction, AppealStatus, UserStatus } from '../../types';
 import type { AxiosError } from 'axios';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -258,8 +258,8 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           {[
             { label: 'Total Users', val: users.length,                                   icon: '👥', col: 'text-slate-700' },
-            { label: 'Suspended',   val: users.filter(u => u.status === 'suspended').length, icon: '⏸', col: 'text-amber-600' },
-            { label: 'Banned',      val: users.filter(u => u.status === 'banned').length,    icon: '🚫', col: 'text-red-600' },
+            { label: 'Suspended',   val: users.filter(u => u.status === UserStatus.SUSPENDED).length, icon: '⏸', col: 'text-amber-600' },
+            { label: 'Banned',      val: users.filter(u => u.status === UserStatus.BANNED).length,    icon: '🚫', col: 'text-red-600' },
           ].map(s => (
             <div key={s.label} className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm">
               <div className="flex items-center justify-between mb-1">
@@ -312,9 +312,9 @@ export default function AdminDashboard() {
                           <td className="px-5 py-4 text-slate-400 text-xs">{fmt(user.createdAt)}</td>
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-2">
-                              {user.status === 'active' && <><button onClick={() => openModal(user, 'suspend')} className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold transition-colors">Suspend</button><button onClick={() => openModal(user, 'ban')} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg text-xs font-semibold transition-colors">Ban</button></>}
-                              {user.status === 'suspended' && <><button onClick={() => openModal(user, 'activate')} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold transition-colors">Activate</button><button onClick={() => openModal(user, 'ban')} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg text-xs font-semibold transition-colors">Ban</button></>}
-                              {user.status === 'banned' && <button onClick={() => openModal(user, 'activate')} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold transition-colors">Unban</button>}
+                              {user.status === UserStatus.ACTIVE && <><button onClick={() => openModal(user, 'suspend')} className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold transition-colors">Suspend</button><button onClick={() => openModal(user, 'ban')} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg text-xs font-semibold transition-colors">Ban</button></>}
+                              {user.status === UserStatus.SUSPENDED && <><button onClick={() => openModal(user, 'activate')} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold transition-colors">Activate</button><button onClick={() => openModal(user, 'ban')} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg text-xs font-semibold transition-colors">Ban</button></>}
+                              {user.status === UserStatus.BANNED && <button onClick={() => openModal(user, 'activate')} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold transition-colors">Unban</button>}
                             </div>
                           </td>
                         </tr>
@@ -333,9 +333,9 @@ export default function AdminDashboard() {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_BADGE[user.status]}`}>{user.status.charAt(0).toUpperCase() + user.status.slice(1)}</span>
                       </div>
                       <div className="flex gap-2">
-                        {user.status === 'active' && <><button onClick={() => openModal(user, 'suspend')} className="flex-1 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold">Suspend</button><button onClick={() => openModal(user, 'ban')} className="flex-1 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">Ban</button></>}
-                        {user.status === 'suspended' && <><button onClick={() => openModal(user, 'activate')} className="flex-1 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold">Activate</button><button onClick={() => openModal(user, 'ban')} className="flex-1 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">Ban</button></>}
-                        {user.status === 'banned' && <button onClick={() => openModal(user, 'activate')} className="w-full py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold">Unban</button>}
+                        {user.status === UserStatus.ACTIVE && <><button onClick={() => openModal(user, 'suspend')} className="flex-1 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold">Suspend</button><button onClick={() => openModal(user, 'ban')} className="flex-1 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">Ban</button></>}
+                        {user.status === UserStatus.SUSPENDED && <><button onClick={() => openModal(user, 'activate')} className="flex-1 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold">Activate</button><button onClick={() => openModal(user, 'ban')} className="flex-1 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">Ban</button></>}
+                        {user.status === UserStatus.BANNED && <button onClick={() => openModal(user, 'activate')} className="w-full py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold">Unban</button>}
                       </div>
                     </div>
                   ))}
