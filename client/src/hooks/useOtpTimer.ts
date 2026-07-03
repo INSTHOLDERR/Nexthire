@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * ever changes server-side, update OTP_DURATION_SECONDS here to match —
  * this is the one place the frontend timer length is defined.
  */
-export const OTP_DURATION_SECONDS = 3 * 60; // 3 minutes, mirrors server's OTP_SESSION_TTL_MS
+export const OTP_DURATION_SECONDS = 30; // 30 seconds, mirrors server's OTP_SESSION_TTL_MS
 
 interface UseOtpTimerResult {
   /** Seconds remaining, counting down from OTP_DURATION_SECONDS to 0. */

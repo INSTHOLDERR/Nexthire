@@ -1,23 +1,35 @@
 import mongoose, { Schema } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
+import { UserStatus, AuthProvider, UserRole } from '../../../domain/entities/enums';
 
 const userSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: String,
     googleId: String,
-    authProvider: { type: String, enum: ['email', 'google'], default: 'email' },
+    authProvider: {
+      type: String,
+      enum: Object.values(AuthProvider),
+      default: AuthProvider.EMAIL,
+    },
     isEmailVerified: { type: Boolean, default: false },
 
     firstName: { type: String, trim: true },
     lastName: { type: String, trim: true },
     profilePicture: String,
 
-    role: { type: String, enum: ['jobseeker', 'student'] },
+    role: {
+      type: String,
+      enum: Object.values(UserRole),
+    },
 
     onboardingComplete: { type: Boolean, default: false },
 
-    status: { type: String, enum: ['active', 'suspended', 'banned'], default: 'active' },
+    status: {
+      type: String,
+      enum: Object.values(UserStatus),
+      default: UserStatus.ACTIVE,
+    },
 
     suspensionReason: { type: String, default: null },
     suspendedAt: { type: Date, default: null },

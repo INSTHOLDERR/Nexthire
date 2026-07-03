@@ -3,6 +3,7 @@ import { GetUsersUseCase, SetUserStatusUseCase, GetAppealsUseCase, ReviewAppealU
 import userRepo from '../../../infrastructure/repositories/MongoUserRepository';
 import appealRepo from '../../../infrastructure/repositories/MongoAppealRepository';
 import emailService from '../../../infrastructure/services/EmailService';
+import { AppealStatus } from '../../../domain/entities/enums';
 
 const getUsersUseCase = new GetUsersUseCase(userRepo);
 const setUserStatusUseCase = new SetUserStatusUseCase(userRepo, emailService);
@@ -48,7 +49,7 @@ export const getAppeals = async (_req: Request, res: Response, next: NextFunctio
 export const reviewAppeal = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { appealId } = req.params;
-    const { status, adminMsg } = req.body as { status: 'approved' | 'rejected'; adminMsg: string };
+    const { status, adminMsg } = req.body as { status: AppealStatus.APPROVED | AppealStatus.REJECTED; adminMsg: string };
     const io = req.app.locals.io;
 
     const appeal = await reviewAppealUseCase.execute({ appealId, status, adminMsg, io });

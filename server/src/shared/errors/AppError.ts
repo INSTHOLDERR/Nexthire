@@ -1,7 +1,11 @@
 import { ErrorCode } from './error-codes';
 import { IUser } from '../../domain/entities/user.types';
 
-
+/**
+ * The only error class the application layer throws. Always carries an
+ * HTTP status and a machine-readable code, optionally extra `data`
+ * (e.g. ban/suspend details the frontend needs to render a redirect page).
+ */
 export class AppError extends Error {
   constructor(
     public readonly status: number,

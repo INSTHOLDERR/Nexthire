@@ -7,6 +7,7 @@ import { AppError } from '../../shared/errors/AppError';
 import { ErrorCode } from '../../shared/errors/error-codes';
 import { Server } from 'socket.io';
 import { UseCase } from '../UseCase';
+import { UserStatus, AppealStatus } from '../../domain/entities/enums';
 
 // ─── GetUsersUseCase ────────────────────────────────────────────────────────
 
@@ -46,19 +47,19 @@ export class SetUserStatusUseCase extends UseCase<SetUserStatusInput, IUser> {
     let update: Record<string, unknown> = {};
 
     if (action === 'ban') {
-      update = { status: 'banned', banReason: reason || 'Violated terms of service', bannedAt: new Date() };
+      update = { status: UserStatus.BANNED, banReason: reason || 'Violated terms of service', bannedAt: new Date() };
     } else if (action === 'suspend') {
       const until = new Date();
       until.setDate(until.getDate() + (parseInt(String(suspendDays)) || 7));
       update = {
-        status: 'suspended',
+        status: UserStatus.SUSPENDED,
         suspensionReason: reason || 'Temporary suspension',
         suspendedAt: new Date(),
         suspendedUntil: until,
       };
     } else if (action === 'activate') {
       update = {
-        status: 'active',
+        status: UserStatus.ACTIVE,
         suspensionReason: null,
         suspendedAt: null,
         suspendedUntil: null,
@@ -75,12 +76,12 @@ export class SetUserStatusUseCase extends UseCase<SetUserStatusInput, IUser> {
     if (io) {
       if (action === 'ban') {
         io.to(`user:${userId}`).emit('account_status_changed', {
-          code: 'BANNED',
+          code: ErrorCode.ACCOUNT_BANNED,
           data: { banReason: update.banReason, bannedAt: update.bannedAt },
         });
       } else if (action === 'suspend') {
         io.to(`user:${userId}`).emit('account_status_changed', {
-          code: 'SUSPENDED',
+          code: ErrorCode.ACCOUNT_SUSPENDED,
           data: {
             userId: String(user._id),
             suspensionReason: update.suspensionReason,
@@ -130,7 +131,7 @@ export class GetAppealsUseCase extends UseCase<void, IAppeal[]> {
 
 interface ReviewAppealInput {
   appealId: string;
-  status: 'approved' | 'rejected';
+  status: AppealStatus.APPROVED | AppealStatus.REJECTED;
   adminMsg: string;
   io?: Server;
 }
@@ -145,7 +146,7 @@ export class ReviewAppealUseCase extends UseCase<ReviewAppealInput, IAppeal> {
   }
 
   async execute({ appealId, status, adminMsg, io }: ReviewAppealInput): Promise<IAppeal> {
-    if (!['approved', 'rejected'].includes(status)) {
+    if (![AppealStatus.APPROVED, AppealStatus.REJECTED].includes(status)) {
       throw AppError.badRequest('Status must be approved or rejected.', ErrorCode.APPEAL_INVALID_STATUS);
     }
     if (!adminMsg?.trim()) {
@@ -157,7 +158,7 @@ export class ReviewAppealUseCase extends UseCase<ReviewAppealInput, IAppeal> {
 
     const appealUser = appeal.userId as { _id: string; email: string; firstName?: string; lastName?: string };
 
-    if (status === 'approved' && appealUser) {
+    if (status === AppealStatus.APPROVED && appealUser) {
       await this.setUserStatusUseCase.execute({
         userId: appealUser._id,
         action: 'activate',
@@ -196,12 +197,15 @@ export class ReviewAppealUseCase extends UseCase<ReviewAppealInput, IAppeal> {
 }
 
 // ─── AdminLoginUseCase ──────────────────────────────────────────────────────
-
+// Credentials come from env, never hardcoded in source.
 
 interface AdminLoginInput { email: string; password: string }
 interface AdminLoginOutput { email: string }
 
 export class AdminLoginUseCase extends UseCase<AdminLoginInput, AdminLoginOutput> {
+  // No real async work happens here (env var comparison is synchronous),
+  // but execute() is declared `async` to satisfy the abstract base class's
+  // Promise<TOutput> contract uniformly across every use case in the app.
   async execute({ email, password }: AdminLoginInput): Promise<AdminLoginOutput> {
     const ADMIN_EMAIL = process.env.ADMIN_EMAIL as string;
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD as string;

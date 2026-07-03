@@ -43,7 +43,7 @@ export class MongoAppealRepository implements IAppealRepository {
   }
 
   async findPending(userId: string, type: AppealType): Promise<IAppeal | null> {
-    const appeal = await AppealModel.findOne({ userId, type, status: 'pending' });
+    const appeal = await AppealModel.findOne({ userId, type, status: AppealStatus.PENDING });
     return appeal ? this.mapToEntity(appeal) : null;
   }
 

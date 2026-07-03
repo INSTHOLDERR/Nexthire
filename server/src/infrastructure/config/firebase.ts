@@ -1,6 +1,11 @@
 import admin from 'firebase-admin';
 
-
+/**
+ * Initialization is deferred to first use, not run at module-import time.
+ * Importing this file (e.g. transitively through AuthController) must never
+ * crash the whole server just because Google auth isn't configured yet —
+ * only the one endpoint that actually needs it should fail if creds are missing.
+ */
 export function getFirebaseAdmin(): typeof admin {
   if (!admin.apps.length) {
     const projectId = process.env.FIREBASE_PROJECT_ID;

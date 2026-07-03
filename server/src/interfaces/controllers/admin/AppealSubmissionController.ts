@@ -5,10 +5,11 @@ import appealRepo from '../../../infrastructure/repositories/MongoAppealReposito
 import uploadService from '../../../infrastructure/services/CloudinaryService';
 import { AppError } from '../../../shared/errors/AppError';
 import { ErrorCode } from '../../../shared/errors/error-codes';
+import { AppealType } from '../../../domain/entities/enums';
 
 const submitAppealUseCase = new SubmitAppealUseCase(userRepo, appealRepo, uploadService);
 
-export const submitAppeal = (type: 'suspension' | 'ban') =>
+export const submitAppeal = (type: AppealType) =>
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userId, explanation } = req.body;

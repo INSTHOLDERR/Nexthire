@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwtService from '../../infrastructure/services/JWTService';
 import userRepo from '../../infrastructure/repositories/MongoUserRepository';
 import { ErrorCode } from '../../shared/errors/error-codes';
+import { UserStatus } from '../../domain/entities/enums';
 
 export const protect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
@@ -21,7 +22,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    if (user.status === 'banned') {
+    if (user.status === UserStatus.BANNED) {
       res.status(403).json({
         success: false,
         code: ErrorCode.ACCOUNT_BANNED,
@@ -36,7 +37,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    if (user.status === 'suspended') {
+    if (user.status === UserStatus.SUSPENDED) {
       res.status(403).json({
         success: false,
         code: ErrorCode.ACCOUNT_SUSPENDED,

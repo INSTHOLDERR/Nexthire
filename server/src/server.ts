@@ -5,7 +5,14 @@ import { Server } from 'socket.io';
 import app from './app';
 import connectDB from './infrastructure/database/connection';
 
-
+/**
+ * Opt-in DNS override for networks whose default resolver can't resolve
+ * MongoDB Atlas's `mongodb+srv://` SRV records (common on some ISPs,
+ * restrictive routers, or misconfigured Windows DNS). OFF by default —
+ * forcing every DNS lookup through public resolvers can break things on
+ * networks with their own internal DNS (corporate VPNs, etc.), so this
+ * only activates if USE_PUBLIC_DNS=true is explicitly set in .env.
+ */
 if (process.env.USE_PUBLIC_DNS === 'true') {
   dns.setServers(['1.1.1.1', '8.8.8.8']);
   console.log('🌐 Using public DNS servers (1.1.1.1, 8.8.8.8) for all lookups — USE_PUBLIC_DNS=true');

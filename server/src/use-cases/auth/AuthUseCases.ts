@@ -9,6 +9,7 @@ import { OTP_MAX_ATTEMPTS } from '../../domain/entities/otp.types';
 import { AppError } from '../../shared/errors/AppError';
 import { ErrorCode } from '../../shared/errors/error-codes';
 import { UseCase } from '../UseCase';
+import { UserStatus, OTPSessionType, AuthProvider } from '../../domain/entities/enums';
 
 // ─── RegisterUseCase ────────────────────────────────────────────────────────
 
@@ -29,10 +30,10 @@ export class RegisterUseCase extends UseCase<RegisterInput, RegisterOutput> {
     const existing = await this.userRepo.findByEmail(email);
 
     if (existing) {
-      if (existing.status === 'banned') {
+      if (existing.status === UserStatus.BANNED) {
         throw AppError.bannedAccount(existing);
       }
-      if (existing.status === 'suspended') {
+      if (existing.status === UserStatus.SUSPENDED) {
         throw AppError.suspendedAccount(existing);
       }
       throw AppError.conflict('An account with this email already exists.', ErrorCode.EMAIL_EXISTS);
@@ -41,9 +42,10 @@ export class RegisterUseCase extends UseCase<RegisterInput, RegisterOutput> {
     const hashedPassword = await bcrypt.hash(password, 12);
     const otp = this.otpGenerator.generate();
 
-    // Fresh 3-minute session 
+    // Fresh OTP session — wipes any earlier pending registration for this email.
+    // Sets both the short code window and the longer registration-intent window.
     await this.otpRepo.createOrResetPendingRegistration(email, otp, hashedPassword);
-    await this.emailService.sendOTP(email, otp, 'email_verify');
+    await this.emailService.sendOTP(email, otp, OTPSessionType.EMAIL_VERIFY);
 
     return { email };
   }
@@ -88,7 +90,7 @@ export class VerifyOTPUseCase extends UseCase<VerifyOTPInput, VerifyOTPOutput> {
 
     await this.otpRepo.markUsed(session._id);
 
-    if (type === 'email_verify') {
+    if (type === OTPSessionType.EMAIL_VERIFY) {
       let user = await this.userRepo.findByEmail(email);
 
       if (!user) {
@@ -101,7 +103,7 @@ export class VerifyOTPUseCase extends UseCase<VerifyOTPInput, VerifyOTPOutput> {
         user = await this.userRepo.createWithHashedPassword({
           email,
           password: session.pendingPassword,
-          authProvider: 'email',
+          authProvider: AuthProvider.EMAIL,
           isEmailVerified: true,
         });
       } else {
@@ -121,7 +123,7 @@ export class VerifyOTPUseCase extends UseCase<VerifyOTPInput, VerifyOTPOutput> {
       };
     }
 
-    if (type === 'login_verify') {
+    if (type === OTPSessionType.LOGIN_VERIFY) {
       const user = await this.userRepo.findByEmail(email);
       if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
 
@@ -169,17 +171,17 @@ export class LoginUseCase extends UseCase<LoginInput, LoginOutput> {
       throw AppError.notFound('No account found with this email.', ErrorCode.EMAIL_NOT_FOUND);
     }
 
-    if (user.authProvider === 'google' && !user.password) {
+    if (user.authProvider === AuthProvider.GOOGLE && !user.password) {
       throw AppError.badRequest(
         'This account was created with Google. Use "Forgot password" to set a password first.',
         ErrorCode.GOOGLE_ONLY_ACCOUNT
       );
     }
 
-    if (user.status === 'banned') {
+    if (user.status === UserStatus.BANNED) {
       throw AppError.bannedAccount(user);
     }
-    if (user.status === 'suspended') {
+    if (user.status === UserStatus.SUSPENDED) {
       throw AppError.suspendedAccount(user);
     }
 
@@ -200,8 +202,8 @@ export class LoginUseCase extends UseCase<LoginInput, LoginOutput> {
     }
 
     const otp = this.otpGenerator.generate();
-    await this.otpRepo.createOrReset(email, otp, 'login_verify');
-    await this.emailService.sendOTP(email, otp, 'login_verify');
+    await this.otpRepo.createOrReset(email, otp, OTPSessionType.LOGIN_VERIFY);
+    await this.emailService.sendOTP(email, otp, OTPSessionType.LOGIN_VERIFY);
 
     return { email };
   }
@@ -233,10 +235,10 @@ export class GoogleAuthUseCase extends UseCase<GoogleAuthInput, GoogleAuthOutput
     let user = await this.userRepo.findByEmail(email);
 
     if (user) {
-      if (user.status === 'banned') {
+      if (user.status === UserStatus.BANNED) {
         throw AppError.bannedAccount(user);
       }
-      if (user.status === 'suspended') {
+      if (user.status === UserStatus.SUSPENDED) {
         throw AppError.suspendedAccount(user);
       }
       await this.userRepo.update(user._id, { googleId: uid, profilePicture: user.profilePicture || picture });
@@ -248,7 +250,7 @@ export class GoogleAuthUseCase extends UseCase<GoogleAuthInput, GoogleAuthOutput
         firstName,
         lastName,
         profilePicture: picture,
-        authProvider: 'google',
+        authProvider: AuthProvider.GOOGLE,
         isEmailVerified: true,
       });
     }
@@ -290,8 +292,8 @@ export class ForgotPasswordUseCase extends UseCase<ForgotPasswordInput, ForgotPa
     }
 
     const otp = this.otpGenerator.generate();
-    await this.otpRepo.createOrReset(email, otp, 'forgot_password');
-    await this.emailService.sendOTP(email, otp, 'forgot_password');
+    await this.otpRepo.createOrReset(email, otp, OTPSessionType.FORGOT_PASSWORD);
+    await this.emailService.sendOTP(email, otp, OTPSessionType.FORGOT_PASSWORD);
 
     return { message: 'OTP sent to your email.' };
   }
@@ -314,7 +316,7 @@ export class ResetPasswordUseCase extends UseCase<ResetPasswordInput, ResetPassw
     const hashed = await bcrypt.hash(newPassword, 12);
     await this.userRepo.update(user._id, {
       password: hashed,
-      authProvider: 'email',
+      authProvider: AuthProvider.EMAIL,
       isEmailVerified: true,
     });
 
@@ -358,7 +360,7 @@ export class ResendOTPUseCase extends UseCase<ResendOTPInput, ResendOTPOutput> {
     // Reuses the same hashed password already stored on the pending session —
     // resend never needs the plaintext password again.
     await this.otpRepo.createOrResetPendingRegistration(email, otp, pending.pendingPassword);
-    await this.emailService.sendOTP(email, otp, 'email_verify');
+    await this.emailService.sendOTP(email, otp, OTPSessionType.EMAIL_VERIFY);
 
     return { email };
   }
