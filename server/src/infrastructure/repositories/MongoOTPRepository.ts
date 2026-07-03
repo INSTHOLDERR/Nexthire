@@ -1,9 +1,10 @@
 import { IOTPRepository } from '../../domain/repositories/otp.repository';
 import { IOTPSession, OTPSessionType, OTP_SESSION_TTL_MS, REGISTRATION_INTENT_TTL_MS } from '../../domain/entities/otp.types';
 import { OTPSessionModel } from '../database/models/OTPSessionModel';
+import { BaseRepository } from './BaseRepository';
 
-export class MongoOTPRepository implements IOTPRepository {
-  private mapToEntity(doc: any): IOTPSession {
+export class MongoOTPRepository extends BaseRepository<IOTPSession> implements IOTPRepository {
+  protected mapToEntity(doc: any): IOTPSession {
     return {
       _id: doc._id.toString(),
       email: doc.email,

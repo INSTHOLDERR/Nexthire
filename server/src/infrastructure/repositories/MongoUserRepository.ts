@@ -1,9 +1,10 @@
 import { IUserRepository } from '../../domain/repositories/user.repository';
 import { IUser } from '../../domain/entities/user.types';
 import { UserModel } from '../database/models/UserModel';
+import { BaseRepository } from './BaseRepository';
 
-export class MongoUserRepository implements IUserRepository {
-  private mapToEntity(user: any): IUser {
+export class MongoUserRepository extends BaseRepository<IUser> implements IUserRepository {
+  protected mapToEntity(user: any): IUser {
     return {
       _id: user._id.toString(),
       email: user.email,

@@ -10,13 +10,13 @@ import { AppError } from '../../shared/errors/AppError';
 import { ErrorCode } from '../../shared/errors/error-codes';
 import { UseCase } from '../UseCase';
 import { UserStatus, OTPSessionType, AuthProvider } from '../../domain/entities/enums';
+import { AuthResponseDTO, PendingAuthDTO, MessageDTO, OTPVerifiedDTO } from '../dto/user.dto';
 
 // ─── RegisterUseCase ────────────────────────────────────────────────────────
 
 interface RegisterInput { email: string; password: string }
-interface RegisterOutput { email: string }
 
-export class RegisterUseCase extends UseCase<RegisterInput, RegisterOutput> {
+export class RegisterUseCase extends UseCase<RegisterInput, PendingAuthDTO> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly otpRepo: IOTPRepository,
@@ -26,7 +26,7 @@ export class RegisterUseCase extends UseCase<RegisterInput, RegisterOutput> {
     super();
   }
 
-  async execute({ email, password }: RegisterInput): Promise<RegisterOutput> {
+  async execute({ email, password }: RegisterInput): Promise<PendingAuthDTO> {
     const existing = await this.userRepo.findByEmail(email);
 
     if (existing) {
@@ -47,7 +47,7 @@ export class RegisterUseCase extends UseCase<RegisterInput, RegisterOutput> {
     await this.otpRepo.createOrResetPendingRegistration(email, otp, hashedPassword);
     await this.emailService.sendOTP(email, otp, OTPSessionType.EMAIL_VERIFY);
 
-    return { email };
+    return new PendingAuthDTO(email);
   }
 }
 
@@ -55,10 +55,7 @@ export class RegisterUseCase extends UseCase<RegisterInput, RegisterOutput> {
 
 interface VerifyOTPInput { email: string; otp: string; type: string }
 
-type VerifyOTPOutput =
-  | { token: string; user: { id: string; email: string; onboardingComplete: boolean; profilePicture?: string; firstName?: string } }
-  | { token: string; user: { id: string; email: string; firstName?: string; lastName?: string; profilePicture?: string; onboardingComplete: boolean; status: string } }
-  | { verified: true; email: string };
+type VerifyOTPOutput = AuthResponseDTO | OTPVerifiedDTO;
 
 export class VerifyOTPUseCase extends UseCase<VerifyOTPInput, VerifyOTPOutput> {
   constructor(
@@ -111,16 +108,7 @@ export class VerifyOTPUseCase extends UseCase<VerifyOTPInput, VerifyOTPOutput> {
       }
 
       const token = this.tokenService.generate(user._id);
-      return {
-        token,
-        user: {
-          id: user._id,
-          email: user.email,
-          onboardingComplete: user.onboardingComplete,
-          profilePicture: user.profilePicture,
-          firstName: user.firstName,
-        },
-      };
+      return new AuthResponseDTO(token, user);
     }
 
     if (type === OTPSessionType.LOGIN_VERIFY) {
@@ -128,22 +116,11 @@ export class VerifyOTPUseCase extends UseCase<VerifyOTPInput, VerifyOTPOutput> {
       if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
 
       const token = this.tokenService.generate(user._id);
-      return {
-        token,
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          profilePicture: user.profilePicture,
-          onboardingComplete: user.onboardingComplete,
-          status: user.status,
-        },
-      };
+      return new AuthResponseDTO(token, user);
     }
 
     // forgot_password — confirms the code; ResetPasswordUseCase does the actual reset.
-    return { verified: true, email };
+    return new OTPVerifiedDTO(email);
   }
 }
 
@@ -153,9 +130,8 @@ export class VerifyOTPUseCase extends UseCase<VerifyOTPInput, VerifyOTPOutput> {
 // just calls /auth/login again.
 
 interface LoginInput { email: string; password: string }
-interface LoginOutput { email: string }
 
-export class LoginUseCase extends UseCase<LoginInput, LoginOutput> {
+export class LoginUseCase extends UseCase<LoginInput, PendingAuthDTO> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly otpRepo: IOTPRepository,
@@ -165,7 +141,7 @@ export class LoginUseCase extends UseCase<LoginInput, LoginOutput> {
     super();
   }
 
-  async execute({ email, password }: LoginInput): Promise<LoginOutput> {
+  async execute({ email, password }: LoginInput): Promise<PendingAuthDTO> {
     const user = await this.userRepo.findByEmail(email);
     if (!user) {
       throw AppError.notFound('No account found with this email.', ErrorCode.EMAIL_NOT_FOUND);
@@ -205,19 +181,15 @@ export class LoginUseCase extends UseCase<LoginInput, LoginOutput> {
     await this.otpRepo.createOrReset(email, otp, OTPSessionType.LOGIN_VERIFY);
     await this.emailService.sendOTP(email, otp, OTPSessionType.LOGIN_VERIFY);
 
-    return { email };
+    return new PendingAuthDTO(email);
   }
 }
 
 // ─── GoogleAuthUseCase ──────────────────────────────────────────────────────
 
 interface GoogleAuthInput { idToken: string }
-interface GoogleAuthOutput {
-  token: string;
-  user: { id: string; email: string; firstName?: string; lastName?: string; profilePicture?: string; onboardingComplete: boolean };
-}
 
-export class GoogleAuthUseCase extends UseCase<GoogleAuthInput, GoogleAuthOutput> {
+export class GoogleAuthUseCase extends UseCase<GoogleAuthInput, AuthResponseDTO> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly tokenService: ITokenService,
@@ -226,7 +198,7 @@ export class GoogleAuthUseCase extends UseCase<GoogleAuthInput, GoogleAuthOutput
     super();
   }
 
-  async execute({ idToken }: GoogleAuthInput): Promise<GoogleAuthOutput> {
+  async execute({ idToken }: GoogleAuthInput): Promise<AuthResponseDTO> {
     const { uid, email, name, picture } = await this.googleAuth.verifyIdToken(idToken);
     const nameParts = (name || '').split(' ');
     const firstName = nameParts[0] || '';
@@ -256,26 +228,15 @@ export class GoogleAuthUseCase extends UseCase<GoogleAuthInput, GoogleAuthOutput
     }
 
     const token = this.tokenService.generate(user._id);
-    return {
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        profilePicture: user.profilePicture,
-        onboardingComplete: user.onboardingComplete,
-      },
-    };
+    return new AuthResponseDTO(token, user);
   }
 }
 
 // ─── ForgotPasswordUseCase ──────────────────────────────────────────────────
 
 interface ForgotPasswordInput { email: string }
-interface ForgotPasswordOutput { message: string }
 
-export class ForgotPasswordUseCase extends UseCase<ForgotPasswordInput, ForgotPasswordOutput> {
+export class ForgotPasswordUseCase extends UseCase<ForgotPasswordInput, MessageDTO> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly otpRepo: IOTPRepository,
@@ -285,7 +246,7 @@ export class ForgotPasswordUseCase extends UseCase<ForgotPasswordInput, ForgotPa
     super();
   }
 
-  async execute({ email }: ForgotPasswordInput): Promise<ForgotPasswordOutput> {
+  async execute({ email }: ForgotPasswordInput): Promise<MessageDTO> {
     const user = await this.userRepo.findByEmail(email);
     if (!user) {
       throw AppError.notFound('No account found with this email.', ErrorCode.EMAIL_NOT_FOUND);
@@ -295,21 +256,20 @@ export class ForgotPasswordUseCase extends UseCase<ForgotPasswordInput, ForgotPa
     await this.otpRepo.createOrReset(email, otp, OTPSessionType.FORGOT_PASSWORD);
     await this.emailService.sendOTP(email, otp, OTPSessionType.FORGOT_PASSWORD);
 
-    return { message: 'OTP sent to your email.' };
+    return new MessageDTO('OTP sent to your email.');
   }
 }
 
 // ─── ResetPasswordUseCase ───────────────────────────────────────────────────
 
 interface ResetPasswordInput { email: string; newPassword: string }
-interface ResetPasswordOutput { message: string }
 
-export class ResetPasswordUseCase extends UseCase<ResetPasswordInput, ResetPasswordOutput> {
+export class ResetPasswordUseCase extends UseCase<ResetPasswordInput, MessageDTO> {
   constructor(private readonly userRepo: IUserRepository) {
     super();
   }
 
-  async execute({ email, newPassword }: ResetPasswordInput): Promise<ResetPasswordOutput> {
+  async execute({ email, newPassword }: ResetPasswordInput): Promise<MessageDTO> {
     const user = await this.userRepo.findByEmail(email);
     if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
 
@@ -320,24 +280,15 @@ export class ResetPasswordUseCase extends UseCase<ResetPasswordInput, ResetPassw
       isEmailVerified: true,
     });
 
-    return { message: 'Password reset successful.' };
+    return new MessageDTO('Password reset successful.');
   }
 }
 
 // ─── ResendOTPUseCase ───────────────────────────────────────────────────────
-// Handles `email_verify` resends specifically. login_verify and
-// forgot_password resends are already covered by re-calling LoginUseCase /
-// ForgotPasswordUseCase (both call createOrReset, which is exactly a resend).
-// email_verify can't safely reuse RegisterUseCase for a resend: the user
-// record may not exist yet, the frontend no longer has the original
-// plaintext password at the verify step, and re-running full registration
-// validation (e.g. the EMAIL_EXISTS check) is the wrong semantic for
-// "I already registered, just resend the code."
 
 interface ResendOTPInput { email: string }
-interface ResendOTPOutput { email: string }
 
-export class ResendOTPUseCase extends UseCase<ResendOTPInput, ResendOTPOutput> {
+export class ResendOTPUseCase extends UseCase<ResendOTPInput, PendingAuthDTO> {
   constructor(
     private readonly otpRepo: IOTPRepository,
     private readonly emailService: IEmailService,
@@ -346,7 +297,7 @@ export class ResendOTPUseCase extends UseCase<ResendOTPInput, ResendOTPOutput> {
     super();
   }
 
-  async execute({ email }: ResendOTPInput): Promise<ResendOTPOutput> {
+  async execute({ email }: ResendOTPInput): Promise<PendingAuthDTO> {
     const pending = await this.otpRepo.findPendingRegistration(email);
 
     if (!pending || !pending.pendingPassword) {
@@ -362,6 +313,6 @@ export class ResendOTPUseCase extends UseCase<ResendOTPInput, ResendOTPOutput> {
     await this.otpRepo.createOrResetPendingRegistration(email, otp, pending.pendingPassword);
     await this.emailService.sendOTP(email, otp, OTPSessionType.EMAIL_VERIFY);
 
-    return { email };
+    return new PendingAuthDTO(email);
   }
 }

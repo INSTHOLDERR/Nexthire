@@ -1,9 +1,10 @@
 import { IAppealRepository } from '../../domain/repositories/appeal.repository';
 import { IAppeal, AppealStatus, AppealType } from '../../domain/entities/appeal.types';
 import { AppealModel } from '../database/models/AppealModel';
+import { BaseRepository } from './BaseRepository';
 
-export class MongoAppealRepository implements IAppealRepository {
-  private mapToEntity(appeal: any): IAppeal {
+export class MongoAppealRepository extends BaseRepository<IAppeal> implements IAppealRepository {
+  protected mapToEntity(appeal: any): IAppeal {
     return {
       _id: appeal._id.toString(),
       userId: appeal.userId as IAppeal['userId'],

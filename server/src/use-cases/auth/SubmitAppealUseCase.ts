@@ -7,6 +7,7 @@ import { UserStatus, AppealType } from '../../domain/entities/enums';
 import { ErrorCode } from '../../shared/errors/error-codes';
 import { Server } from 'socket.io';
 import { UseCase } from '../UseCase';
+import { AppealResponseDTO } from '../dto/appeal.dto';
 
 interface SubmitAppealInput {
   userId: string;
@@ -16,7 +17,7 @@ interface SubmitAppealInput {
   io?: Server;
 }
 
-export class SubmitAppealUseCase extends UseCase<SubmitAppealInput, IAppeal> {
+export class SubmitAppealUseCase extends UseCase<SubmitAppealInput, AppealResponseDTO> {
   constructor(
     private readonly userRepo: IUserRepository,
     private readonly appealRepo: IAppealRepository,
@@ -25,7 +26,7 @@ export class SubmitAppealUseCase extends UseCase<SubmitAppealInput, IAppeal> {
     super();
   }
 
-  async execute({ userId, type, explanation, files, io }: SubmitAppealInput): Promise<IAppeal> {
+  async execute({ userId, type, explanation, files, io }: SubmitAppealInput): Promise<AppealResponseDTO> {
     const user = await this.userRepo.findById(userId);
     if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
 
@@ -57,8 +58,8 @@ export class SubmitAppealUseCase extends UseCase<SubmitAppealInput, IAppeal> {
     const appeal = await this.appealRepo.create({ userId, type, explanation, evidence });
     const populated = await this.appealRepo.findById(appeal._id);
 
-    if (io) io.to('admin').emit('new_appeal', populated);
+    if (io) io.to('admin').emit('new_appeal', new AppealResponseDTO(populated ?? appeal));
 
-    return appeal;
+    return new AppealResponseDTO(appeal);
   }
 }
