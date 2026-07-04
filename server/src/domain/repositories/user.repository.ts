@@ -1,4 +1,21 @@
 import { IUser } from '../entities/user.types';
+import { UserStatus, UserRole } from '../entities/enums';
+
+export interface UserFilter {
+  search?: string;
+  status?: UserStatus;
+  role?: UserRole;
+  page: number;
+  limit: number;
+}
+
+export interface PaginatedUsers {
+  users: IUser[];
+  total: number;
+  page: number;
+  pages: number;
+  limit: number;
+}
 
 export interface IUserRepository {
   findByEmail(email: string): Promise<IUser | null>;
@@ -10,8 +27,5 @@ export interface IUserRepository {
 
   update(id: string, data: Partial<IUser>): Promise<IUser | null>;
 
-  findAll(filter: { search?: string; page: number; limit: number }): Promise<{
-    users: IUser[];
-    total: number;
-  }>;
+  findAll(filter: UserFilter): Promise<PaginatedUsers>;
 }

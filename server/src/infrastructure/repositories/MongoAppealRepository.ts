@@ -1,4 +1,4 @@
-import { IAppealRepository } from '../../domain/repositories/appeal.repository';
+import { IAppealRepository, AppealFilter, PaginatedAppeals } from '../../domain/repositories/appeal.repository';
 import { IAppeal, AppealStatus, AppealType } from '../../domain/entities/appeal.types';
 import { AppealModel } from '../database/models/AppealModel';
 import { BaseRepository } from './BaseRepository';
@@ -36,11 +36,25 @@ export class MongoAppealRepository extends BaseRepository<IAppeal> implements IA
     return appeals.map((a) => this.mapToEntity(a));
   }
 
-  async findAll(): Promise<IAppeal[]> {
-    const appeals = await AppealModel.find()
+  async findAll({ status, type, page, limit }: AppealFilter): Promise<PaginatedAppeals> {
+    const query: Record<string, unknown> = {};
+    if (status) query.status = status;
+    if (type)   query.type   = type;
+
+    const total   = await AppealModel.countDocuments(query);
+    const appeals = await AppealModel.find(query)
       .populate('userId', 'email firstName lastName profilePicture status')
-      .sort({ createdAt: -1 });
-    return appeals.map((a) => this.mapToEntity(a));
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    return {
+      appeals: appeals.map((a) => this.mapToEntity(a)),
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      limit,
+    };
   }
 
   async findPending(userId: string, type: AppealType): Promise<IAppeal | null> {
@@ -49,7 +63,8 @@ export class MongoAppealRepository extends BaseRepository<IAppeal> implements IA
   }
 
   async updateStatus(id: string, status: AppealStatus): Promise<IAppeal | null> {
-    const appeal = await AppealModel.findByIdAndUpdate(id, { status }, { new: true });
+    const appeal = await AppealModel.findByIdAndUpdate(id, { status }, { new: true })
+      .populate('userId', 'email firstName lastName profilePicture status');
     return appeal ? this.mapToEntity(appeal) : null;
   }
 }

@@ -149,40 +149,73 @@ export default function AdminDashboard() {
   const [users,       setUsers]       = useState<AdminUser[]>([]);
   const [appeals,     setAppeals]     = useState<AdminAppeal[]>([]);
   const [search,      setSearch]      = useState('');
-  const [loading,     setLoading]     = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter,   setRoleFilter]   = useState('');
+  const [page,        setPage]        = useState(1);
+  const [totalPages,  setTotalPages]  = useState(1);
+  const [total,       setTotal]       = useState(0);
+  const PAGE_SIZE = 10;
+  const [usersLoading,   setUsersLoading]   = useState(true);
+  const [appealsLoading, setAppealsLoading] = useState(false);
   const [modal,       setModal]       = useState<ModalState | null>(null);
   const [panel,       setPanel]       = useState<AdminAppeal | null>(null);
   const [reason,      setReason]      = useState('');
   const [suspendDays, setSuspendDays] = useState('7');
   const [acting,      setActing]      = useState(false);
+  const [appealStatusFilter, setAppealStatusFilter] = useState('');
+  const [appealTypeFilter,   setAppealTypeFilter]   = useState('');
+  const [appealPage,         setAppealPage]         = useState(1);
+  const [appealTotalPages,   setAppealTotalPages]   = useState(1);
+  const [appealTotal,        setAppealTotal]        = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const logout = () => { localStorage.removeItem('nh_admin_token'); navigate('/admin'); };
 
-  const loadUsers = useCallback(async (q = '') => {
-    setLoading(true);
+  const loadUsers = useCallback(async (opts: { q?: string; status?: string; role?: string; p?: number } = {}) => {
+    setUsersLoading(true);
     try {
-      const res = await getUsers({ search: q, limit: 50 });
-      setUsers(res.data.data.users as AdminUser[]);
+      const res = await getUsers({
+        search: opts.q      !== undefined ? opts.q      : search,
+        status: opts.status !== undefined ? opts.status : (statusFilter || undefined),
+        role:   opts.role   !== undefined ? opts.role   : (roleFilter   || undefined),
+        page:   opts.p      !== undefined ? opts.p      : page,
+        limit:  PAGE_SIZE,
+      });
+      const data = res.data.data;
+      setUsers(data.users as AdminUser[]);
+      setTotal(data.total);
+      setTotalPages(data.pages);
     } catch (err) {
       if ((err as AxiosError).response?.status === 401) { toast.error('Session expired'); logout(); }
-    } finally { setLoading(false); }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    } finally { setUsersLoading(false); }
+  }, [search, statusFilter, roleFilter, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadAppeals = useCallback(async () => {
-    setLoading(true);
+  const loadAppeals = useCallback(async (opts: { status?: string; type?: string; p?: number } = {}) => {
+    setAppealsLoading(true);
     try {
-      const res = await getAppeals();
-      setAppeals(res.data.data as AdminAppeal[]);
+      const res = await getAppeals({
+        status: opts.status !== undefined ? opts.status : (appealStatusFilter || undefined),
+        type:   opts.type   !== undefined ? opts.type   : (appealTypeFilter   || undefined),
+        page:   opts.p      !== undefined ? opts.p      : appealPage,
+        limit:  PAGE_SIZE,
+      });
+      const data = res.data.data;
+      setAppeals(data.appeals as AdminAppeal[]);
+      setAppealTotal(data.total);
+      setAppealTotalPages(data.pages);
     } catch { toast.error('Failed to load appeals'); }
-    finally { setLoading(false); }
-  }, []);
+    finally { setAppealsLoading(false); }
+  }, [appealStatusFilter, appealTypeFilter, appealPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!localStorage.getItem('nh_admin_token')) { navigate('/admin'); return; }
-    if (tab === 'users') loadUsers(search);
-    else loadAppeals();
+    if (tab === 'users') loadUsers({ p: 1 });
+    else loadAppeals({ p: 1 });
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tab === 'appeals') loadAppeals({ p: 1 });
+  }, [appealStatusFilter, appealTypeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const socket = getSocket();
@@ -209,8 +242,26 @@ export default function AdminDashboard() {
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearch(val);
+    setPage(1);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => loadUsers(val), 300);
+    debounceRef.current = setTimeout(() => loadUsers({ q: val, p: 1 }), 300);
+  };
+
+  const handleStatusFilter = (val: string) => {
+    setStatusFilter(val);
+    setPage(1);
+    loadUsers({ status: val, p: 1 });
+  };
+
+  const handleRoleFilter = (val: string) => {
+    setRoleFilter(val);
+    setPage(1);
+    loadUsers({ role: val, p: 1 });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    loadUsers({ p: newPage });
   };
 
   const openModal = (user: AdminUser, action: AdminAction) => { setModal({ user, action }); setReason(''); setSuspendDays('7'); };
@@ -264,7 +315,7 @@ export default function AdminDashboard() {
             <div key={s.label} className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-lg sm:text-xl">{s.icon}</span>
-                <span className={`text-xl sm:text-2xl font-bold ${s.col}`}>{loading && tab === 'users' ? '—' : s.val}</span>
+                <span className={`text-xl sm:text-2xl font-bold ${s.col}`}>{usersLoading ? '—' : s.val}</span>
               </div>
               <p className="text-slate-500 text-xs sm:text-sm">{s.label}</p>
             </div>
@@ -282,22 +333,51 @@ export default function AdminDashboard() {
 
         {tab === 'users' && (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h2 className="font-semibold text-slate-800">All Users</h2>
-              <div className="relative">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
-                <input value={search} onChange={handleSearch} placeholder="Search name or email…" className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 w-full sm:w-64" />
+            {/* Filter bar */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-slate-800">All Users</h2>
+                  {!usersLoading && <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{total} total</span>}
+                </div>
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                  <input value={search} onChange={handleSearch} placeholder="Search name or email…" className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 w-full sm:w-64" />
+                </div>
+              </div>
+              {/* Filter row */}
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={e => handleStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                >
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="banned">Banned</option>
+                </select>
+                <select
+                  value={roleFilter}
+                  onChange={e => handleRoleFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                >
+                  <option value="">All roles</option>
+                  <option value="jobseeker">Job Seeker</option>
+                  <option value="student">Student</option>
+                </select>
               </div>
             </div>
-            {loading ? (
+
+            {usersLoading ? (
               <div className="divide-y divide-slate-100">{Array(5).fill(0).map((_, i) => (<div key={i} className="px-5 py-4 flex items-center gap-4"><Sk c="w-9 h-9 !rounded-full flex-shrink-0" /><Sk c="h-4 w-32" /><Sk c="h-4 w-44 ml-2" /><Sk c="h-5 w-20 !rounded-full ml-auto" /><Sk c="h-7 w-16" /><Sk c="h-7 w-12" /></div>))}</div>
             ) : users.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 text-sm">{search ? `No users matching "${search}"` : 'No users found'}</div>
+              <div className="p-12 text-center text-slate-400 text-sm">No users found</div>
             ) : (
               <>
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead><tr className="bg-slate-50 border-b border-slate-100">{['User', 'Email', 'Status', 'Joined', 'Actions'].map(h => <th key={h} className="text-left px-5 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wide">{h}</th>)}</tr></thead>
+                    <thead><tr className="bg-slate-50 border-b border-slate-100">{['User', 'Email', 'Role', 'Status', 'Joined', 'Actions'].map(h => <th key={h} className="text-left px-5 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wide">{h}</th>)}</tr></thead>
                     <tbody className="divide-y divide-slate-100">
                       {users.map(user => (
                         <tr key={user._id} className="hover:bg-slate-50/60 transition-colors">
@@ -308,6 +388,9 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="px-5 py-4 text-slate-500 text-xs truncate max-w-[160px]">{user.email}</td>
+                          <td className="px-5 py-4">
+                            {user.role ? <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-blue-50 text-blue-700 border-blue-200 capitalize">{user.role}</span> : <span className="text-slate-300 text-xs">—</span>}
+                          </td>
                           <td className="px-5 py-4"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STATUS_BADGE[user.status]}`}>{user.status.charAt(0).toUpperCase() + user.status.slice(1)}</span></td>
                           <td className="px-5 py-4 text-slate-400 text-xs">{fmt(user.createdAt)}</td>
                           <td className="px-5 py-4">
@@ -340,6 +423,32 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
+                {/* Pagination — always shown */}
+                <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">Page {page} of {totalPages} · {total} users</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handlePageChange(page - 1)}
+                        disabled={page <= 1}
+                        className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+                      >← Prev</button>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const p = totalPages <= 5 ? i + 1 : page <= 3 ? i + 1 : page >= totalPages - 2 ? totalPages - 4 + i : page - 2 + i;
+                        return (
+                          <button
+                            key={p}
+                            onClick={() => handlePageChange(p)}
+                            className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${p === page ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 hover:bg-slate-50'}`}
+                          >{p}</button>
+                        );
+                      })}
+                      <button
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page >= totalPages}
+                        className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+                      >Next →</button>
+                    </div>
+                  </div>
               </>
             )}
           </div>
@@ -351,10 +460,35 @@ export default function AdminDashboard() {
               <div><h2 className="font-semibold text-slate-800">User Appeals</h2><p className="text-slate-400 text-xs mt-0.5">New appeals appear instantly · Click any appeal to review</p></div>
               {pending > 0 && <span className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold px-3 py-1.5 rounded-full">{pending} pending</span>}
             </div>
-            {loading ? (
+
+            {/* Appeal Filters */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <select
+                value={appealStatusFilter}
+                onChange={e => { setAppealStatusFilter(e.target.value); setAppealPage(1); }}
+                className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <select
+                value={appealTypeFilter}
+                onChange={e => { setAppealTypeFilter(e.target.value); setAppealPage(1); }}
+                className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="">All types</option>
+                <option value="suspension">Suspension</option>
+                <option value="ban">Ban</option>
+              </select>
+              <span className="ml-auto text-xs text-slate-400 self-center">{appealTotal} total</span>
+            </div>
+
+            {appealsLoading ? (
               <div className="space-y-3">{[1, 2, 3].map(i => (<div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4"><Sk c="w-11 h-11 !rounded-full flex-shrink-0" /><div className="flex-1 space-y-2"><Sk c="h-4 w-36" /><Sk c="h-3 w-60" /><Sk c="h-3 w-44" /></div><Sk c="h-6 w-16 !rounded-full flex-shrink-0" /></div>))}</div>
             ) : appeals.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm"><p className="text-slate-400 text-sm">No appeals yet</p></div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm"><p className="text-slate-400 text-sm">{appealStatusFilter || appealTypeFilter ? 'No appeals match these filters.' : 'No appeals yet'}</p></div>
             ) : (
               <div className="space-y-3">
                 {appeals.map(appeal => {
@@ -382,6 +516,23 @@ export default function AdminDashboard() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Appeals Pagination */}
+            {appealTotalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+                <span className="text-xs text-slate-400">Page {appealPage} of {appealTotalPages} · {appealTotal} appeals</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setAppealPage(p => p - 1); loadAppeals({ p: appealPage - 1 }); }} disabled={appealPage <= 1} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">←</button>
+                  {Array.from({ length: Math.min(5, appealTotalPages) }, (_, i) => {
+                    const p = appealTotalPages <= 5 ? i + 1 : appealPage <= 3 ? i + 1 : appealPage >= appealTotalPages - 2 ? appealTotalPages - 4 + i : appealPage - 2 + i;
+                    return (
+                      <button key={p} onClick={() => { setAppealPage(p); loadAppeals({ p }); }} className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${p === appealPage ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 hover:bg-slate-50'}`}>{p}</button>
+                    );
+                  })}
+                  <button onClick={() => { setAppealPage(p => p + 1); loadAppeals({ p: appealPage + 1 }); }} disabled={appealPage >= appealTotalPages} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">→</button>
+                </div>
               </div>
             )}
           </div>

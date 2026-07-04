@@ -1,5 +1,5 @@
-import { IUserRepository } from '../../domain/repositories/user.repository';
-import { IAppealRepository } from '../../domain/repositories/appeal.repository';
+import { IUserRepository, PaginatedUsers, UserFilter } from '../../domain/repositories/user.repository';
+import { IAppealRepository, PaginatedAppeals } from '../../domain/repositories/appeal.repository';
 import { IUser } from '../../domain/entities/user.types';
 import { IAppeal } from '../../domain/entities/appeal.types';
 import { IEmailService } from '../../domain/services/email.service';
@@ -7,21 +7,39 @@ import { AppError } from '../../shared/errors/AppError';
 import { ErrorCode } from '../../shared/errors/error-codes';
 import { Server } from 'socket.io';
 import { UseCase } from '../UseCase';
-import { UserStatus, AppealStatus } from '../../domain/entities/enums';
+import { UserStatus, AppealStatus, UserRole, AppealType } from '../../domain/entities/enums';
+import cacheService from '../../infrastructure/services/CacheService';
+
+// Cache key helpers — centralised here so invalidation patterns always match
+const usersCacheKey   = (f: UserFilter)   => `admin:users:${JSON.stringify(f)}`;
+const appealsCacheKey = (f: { status?: AppealStatus; type?: AppealType; page: number; limit: number }) =>
+  `admin:appeals:${JSON.stringify(f)}`;
 
 // ─── GetUsersUseCase ────────────────────────────────────────────────────────
 
-interface GetUsersInput { page?: number; limit?: number; search?: string }
-interface GetUsersOutput { users: IUser[]; total: number; page: number; pages: number }
+interface GetUsersInput {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: UserStatus;
+  role?: UserRole;
+}
 
-export class GetUsersUseCase extends UseCase<GetUsersInput, GetUsersOutput> {
+export class GetUsersUseCase extends UseCase<GetUsersInput, PaginatedUsers> {
   constructor(private readonly userRepo: IUserRepository) {
     super();
   }
 
-  async execute({ page = 1, limit = 20, search = '' }: GetUsersInput): Promise<GetUsersOutput> {
-    const { users, total } = await this.userRepo.findAll({ search, page, limit });
-    return { users, total, page, pages: Math.ceil(total / limit) };
+  async execute({ page = 1, limit = 10, search = '', status, role }: GetUsersInput): Promise<PaginatedUsers> {
+    const filter: UserFilter = { search, status, role, page, limit };
+    const key = usersCacheKey(filter);
+
+    const cached = await cacheService.get<PaginatedUsers>(key);
+    if (cached) return cached;
+
+    const result = await this.userRepo.findAll(filter);
+    await cacheService.set(key, result);
+    return result;
   }
 }
 
@@ -112,18 +130,37 @@ export class SetUserStatusUseCase extends UseCase<SetUserStatusInput, IUser> {
       console.warn(`⚠️ Email failed for ${user.email}:`, (emailErr as Error).message);
     }
 
+    // Invalidate all cached user query results — status change means any
+    // page/filter combination that included this user is now stale.
+    await cacheService.invalidatePattern('admin:users:*');
+
     return user;
   }
 }
 
 // ─── GetAppealsUseCase ──────────────────────────────────────────────────────
 
-export class GetAppealsUseCase extends UseCase<void, IAppeal[]> {
+interface GetAppealsInput {
+  status?: AppealStatus;
+  type?: AppealType;
+  page?: number;
+  limit?: number;
+}
+
+export class GetAppealsUseCase extends UseCase<GetAppealsInput, PaginatedAppeals> {
   constructor(private readonly appealRepo: IAppealRepository) {
     super();
   }
-  execute(): Promise<IAppeal[]> {
-    return this.appealRepo.findAll();
+  async execute({ status, type, page = 1, limit = 10 }: GetAppealsInput): Promise<PaginatedAppeals> {
+    const filter = { status, type, page, limit };
+    const key = appealsCacheKey(filter);
+
+    const cached = await cacheService.get<PaginatedAppeals>(key);
+    if (cached) return cached;
+
+    const result = await this.appealRepo.findAll(filter);
+    await cacheService.set(key, result);
+    return result;
   }
 }
 
@@ -191,6 +228,9 @@ export class ReviewAppealUseCase extends UseCase<ReviewAppealInput, IAppeal> {
       });
       io.to('admin').emit('appeal_updated', { appealId: appeal._id, status });
     }
+
+    // Appeal status changed — all cached appeal query results are now stale.
+    await cacheService.invalidatePattern('admin:appeals:*');
 
     return appeal;
   }

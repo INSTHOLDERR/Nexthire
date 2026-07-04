@@ -51,6 +51,7 @@ export interface AdminUser {
   lastName?: string;
   profilePicture?: string;
   status: UserStatus;
+  role?: string;
   suspensionReason?: string;
   suspendedAt?: string;
   suspendedUntil?: string;

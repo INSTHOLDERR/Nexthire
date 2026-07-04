@@ -32,9 +32,24 @@ export interface ReviewAppealPayload {
   adminMsg: string;
 }
 
-export const adminLogin   = (data: { email: string; password: string })    => adminApi.post('/admin/login', data);
-export const getUsers     = (params?: Record<string, unknown>)             => adminApi.get('/admin/users', { params });
-export const setStatus    = (userId: string, data: SetStatusPayload)       => adminApi.patch(`/admin/users/${userId}/status`, data);
-export const getAppeals   = ()                                             => adminApi.get('/admin/appeals');
-export const reviewAppeal = (appealId: string, data: ReviewAppealPayload)  => adminApi.patch(`/admin/appeals/${appealId}/review`, data);
-export const getUserAppeals = (userId: string)                             => adminApi.get(`/admin/appeals/user/${userId}`);
+export interface GetUsersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  role?: string;
+}
+
+export interface GetAppealsParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  type?: string;
+}
+
+export const adminLogin     = (data: { email: string; password: string })     => adminApi.post('/admin/login', data);
+export const getUsers       = (params?: GetUsersParams)                       => adminApi.get('/admin/users', { params });
+export const setStatus      = (userId: string, data: SetStatusPayload)        => adminApi.patch(`/admin/users/${userId}/status`, data);
+export const getAppeals     = (params?: GetAppealsParams)                     => adminApi.get('/admin/appeals', { params });
+export const reviewAppeal   = (appealId: string, data: ReviewAppealPayload)   => adminApi.patch(`/admin/appeals/${appealId}/review`, data);
+export const getUserAppeals = (userId: string)                                => adminApi.get(`/admin/appeals/user/${userId}`);

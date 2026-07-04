@@ -1,4 +1,4 @@
-import { IUserRepository } from '../../domain/repositories/user.repository';
+import { IUserRepository, UserFilter, PaginatedUsers } from '../../domain/repositories/user.repository';
 import { IUser } from '../../domain/entities/user.types';
 import { UserModel } from '../database/models/UserModel';
 import { BaseRepository } from './BaseRepository';
@@ -59,19 +59,35 @@ export class MongoUserRepository extends BaseRepository<IUser> implements IUserR
     return user ? this.mapToEntity(user) : null;
   }
 
-  async findAll(filter: { search?: string; page: number; limit: number }): Promise<{ users: IUser[]; total: number }> {
-    const { search, page, limit } = filter;
-    const query = search
-      ? { $or: [{ email: { $regex: search, $options: 'i' } }, { firstName: { $regex: search, $options: 'i' } }] }
-      : {};
+  async findAll(filter: UserFilter): Promise<PaginatedUsers> {
+    const { search, status, role, page, limit } = filter;
+
+    const query: Record<string, unknown> = {};
+
+    if (search) {
+      query.$or = [
+        { email:     { $regex: search, $options: 'i' } },
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName:  { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (status) query.status = status;
+    if (role)   query.role   = role;
 
     const total = await UserModel.countDocuments(query);
-    const docs = await UserModel.find(query)
+    const docs  = await UserModel.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    return { users: docs.map((d) => this.mapToEntity(d)), total };
+    return {
+      users: docs.map((d) => this.mapToEntity(d)),
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      limit,
+    };
   }
 }
 
