@@ -5,6 +5,51 @@
 
 * { box-sizing: border-box; }
 
+/* Only interactive elements get pointer - NOT the whole page */
+button:not([disabled]),
+a[href],
+a[onclick],
+summary,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+[role="link"],
+select,
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+input[type="submit"],
+input[type="button"],
+input[type="range"],
+label:has(> input[type="file"]),
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]),
+label:has(input[type="file"]) {
+  cursor: pointer;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea {
+  cursor: text;
+}
+
+button[disabled],
+input[disabled],
+select[disabled] {
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+
+/* Articles, divs, spans, paragraphs stay default */
+article, section, div, span, p, h1, h2, h3, h4 {
+  cursor: default;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: #f8fafc;
   color: #1e293b;

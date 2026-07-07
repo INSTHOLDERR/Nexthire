@@ -13,7 +13,11 @@ adminApi.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     const axiosError = error as import('axios').AxiosError;
-    if (axiosError.response?.status === 401) {
+    const isLoginRequest = axiosError.config?.url?.includes('/admin/login');
+    // A failed LOGIN attempt also returns 401 — that must NOT trigger the
+    // session-expired redirect, otherwise the page reloads before the
+    // "Invalid credentials" toast can ever be shown.
+    if (axiosError.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem('nh_admin_token');
       window.location.replace('/admin');
     }
@@ -53,3 +57,27 @@ export const setStatus      = (userId: string, data: SetStatusPayload)        =>
 export const getAppeals     = (params?: GetAppealsParams)                     => adminApi.get('/admin/appeals', { params });
 export const reviewAppeal   = (appealId: string, data: ReviewAppealPayload)   => adminApi.patch(`/admin/appeals/${appealId}/review`, data);
 export const getUserAppeals = (userId: string)                                => adminApi.get(`/admin/appeals/user/${userId}`);
+
+// ── Moderation: reports & warnings ───────────────────────────────────────────
+export interface GetReportsParams { page?: number; targetType?: 'post' | 'user'; status?: string }
+export const getReports          = (params?: GetReportsParams) => adminApi.get('/admin/reports', { params });
+export const actionReport        = (reportId: string, data: { action: 'dismiss' | 'warn' | 'suspend_post' | 'suspend_user' | 'ban_user'; adminNote?: string }) => adminApi.patch(`/admin/reports/${reportId}/action`, data);
+export const getWarnings         = (params?: { page?: number; appealStatus?: string }) => adminApi.get('/admin/warnings', { params });
+export const reviewWarningAppeal = (id: string, data: { decision: 'approved' | 'rejected'; adminNote?: string }) => adminApi.patch(`/admin/warnings/${id}/appeal-review`, data);
+export const revokeWarning       = (id: string) => adminApi.patch(`/admin/warnings/${id}/revoke`);
+
+// ── Dashboard stats & post management ────────────────────────────────────────
+export const getAdminStats   = () => adminApi.get('/admin/stats');
+export const getAdminPosts   = (params?: { page?: number; limit?: number }) => adminApi.get('/posts/admin/posts', { params });
+export const setAdminPostStatus = (postId: string, data: { status: 'active' | 'suspended' | 'removed'; adminNote?: string }) => adminApi.patch(`/posts/admin/posts/${postId}/status`, data);
+export const deleteAdminPost = (postId: string) => adminApi.delete(`/posts/admin/posts/${postId}`);
+
+// ── Detail views ─────────────────────────────────────────────────────────────
+export const getUserDetail = (userId: string) => adminApi.get(`/admin/users/${userId}/detail`);
+export const getPostDetail = (postId: string) => adminApi.get(`/admin/posts/${postId}/detail`);
+
+// ── Per-target overviews (Users / Posts drawers) ─────────────────────────────
+export const getUserOverview = (userId: string) => adminApi.get(`/admin/users/${userId}/overview`);
+export const getPostOverview = (postId: string) => adminApi.get(`/admin/posts/${postId}/overview`);
+
+export const getModerationQueue = () => adminApi.get('/admin/moderation-queue');

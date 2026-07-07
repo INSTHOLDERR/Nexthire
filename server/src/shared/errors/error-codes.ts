@@ -41,4 +41,5 @@ export enum ErrorCode {
   TOKEN_INVALID         = 'TOKEN_INVALID',
   NOT_FOUND             = 'NOT_FOUND',
   INTERNAL_ERROR        = 'INTERNAL_ERROR',
+  ROLE_REQUIRED         = 'ROLE_REQUIRED',   // tried to access a role-gated feature
 }

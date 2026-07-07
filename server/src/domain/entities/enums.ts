@@ -17,8 +17,10 @@ export enum AuthProvider {
 }
 
 export enum UserRole {
-  JOBSEEKER = 'jobseeker',
-  STUDENT   = 'student',
+  USER      = 'user',      // completed onboarding but didn't choose open_to_work/hiring
+  JOBSEEKER = 'jobseeker', // open to work
+  STUDENT   = 'student',   // studying
+  RECRUITER = 'recruiter', // currently hiring
 }
 
 export enum AppealStatus {
@@ -36,4 +38,10 @@ export enum OTPSessionType {
   EMAIL_VERIFY    = 'email_verify',
   FORGOT_PASSWORD = 'forgot_password',
   LOGIN_VERIFY    = 'login_verify',
+}
+
+export enum WorkStatus {
+  NONE             = 'none',              // hasn't set a status
+  OPEN_TO_WORK     = 'open_to_work',      // actively looking for a job
+  CURRENTLY_HIRING = 'currently_hiring',  // recruiter looking to hire
 }

@@ -35,11 +35,37 @@ app.locals.io = io;
 
 io.on('connection', (socket) => {
   socket.on('join', (userId: string) => {
-    if (userId) socket.join(`user:${userId}`);
+    if (userId) {
+      socket.join(`user:${userId}`);
+      socket.join('feed'); // all connected users join the feed room for real-time post updates
+      (socket.data as any).userId = userId;
+    }
   });
   socket.on('join_admin', () => {
     socket.join('admin');
   });
+
+  // ── 1-to-1 WebRTC call signaling ─────────────────────────────────────────
+  // The server only relays SDP/ICE between the two peers; media flows P2P.
+  // Group calls are NOT supported here — they require an SFU (e.g. LiveKit).
+  const me = () => (socket.data as any).userId as string | undefined;
+
+  socket.on('call:offer', ({ to, offer, callType, from }) => {
+    if (to) io.to(`user:${to}`).emit('call:offer', { from: from ?? me(), offer, callType });
+  });
+  socket.on('call:answer', ({ to, answer }) => {
+    if (to) io.to(`user:${to}`).emit('call:answer', { from: me(), answer });
+  });
+  socket.on('call:ice', ({ to, candidate }) => {
+    if (to) io.to(`user:${to}`).emit('call:ice', { from: me(), candidate });
+  });
+  socket.on('call:reject', ({ to }) => {
+    if (to) io.to(`user:${to}`).emit('call:reject', { from: me() });
+  });
+  socket.on('call:end', ({ to }) => {
+    if (to) io.to(`user:${to}`).emit('call:end', { from: me() });
+  });
+
   socket.on('disconnect', () => {});
 });
 

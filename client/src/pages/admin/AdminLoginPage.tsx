@@ -12,17 +12,24 @@ interface AdminLoginForm { email: string; password: string }
 export default function AdminLoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const { register, handleSubmit, formState: { errors } } = useForm<AdminLoginForm>();
 
   const onSubmit = async ({ email, password }: AdminLoginForm) => {
     setLoading(true);
+    setLoginError('');
     try {
       const res = await adminLogin({ email, password });
       localStorage.setItem('nh_admin_token', res.data.token as string);
       toast.success('Welcome, Admin!');
       navigate('/admin/dashboard');
     } catch (err) {
-      toast.error((err as AxiosError<{ message?: string }>).response?.data?.message || 'Invalid credentials');
+      const ax = err as AxiosError<{ message?: string }>;
+      const msg = !ax.response
+        ? 'Cannot reach the server. Is the backend running?'
+        : ax.response.data?.message || 'Invalid email or password';
+      setLoginError(msg);         // visible inline error (survives re-renders)
+      toast.error(msg);           // plus a toast
     } finally { setLoading(false); }
   };
 
@@ -40,6 +47,12 @@ export default function AdminLoginPage() {
             <p className="text-slate-500 text-sm mt-1">Enter your admin credentials to continue</p>
           </div>
           <form onSubmit={handleSubmit(onSubmit)} className="px-8 py-7 space-y-4">
+            {loginError && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-3.5 py-2.5">
+                <span className="mt-0.5">⚠️</span>
+                <span className="font-medium">{loginError}</span>
+              </div>
+            )}
             <div>
               <label className="nh-label">Email</label>
               <input {...register('email', { required: 'Required' })} placeholder="admin@gmail.com" className="nh-input" />

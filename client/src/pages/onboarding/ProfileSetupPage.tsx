@@ -76,8 +76,11 @@ export default function ProfileSetupPage() {
         user: {
           ...user!,
           ...updated,
-          id: updated._id ?? updated.id ?? user!.id,
+          id:             updated._id ?? updated.id ?? user!.id,
           profilePicture: updated.profilePicture ?? user!.profilePicture,
+          role:           updated.role ?? user!.role,
+          headline:       updated.headline ?? user?.headline,
+          workStatus:     updated.workStatus ?? user?.workStatus,
         },
       });
       navigate('/onboarding/role');

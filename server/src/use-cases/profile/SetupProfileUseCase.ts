@@ -4,6 +4,7 @@ import { IUser } from '../../domain/entities/user.types';
 import { AppError } from '../../shared/errors/AppError';
 import { ErrorCode } from '../../shared/errors/error-codes';
 import { UseCase } from '../UseCase';
+import { UserRole, WorkStatus } from '../../domain/entities/enums';
 
 interface SetupProfileInput {
   userId: string;
@@ -11,7 +12,8 @@ interface SetupProfileInput {
   file?: Express.Multer.File;
 }
 
-const BOOLEAN_FIELDS = ['onboardingComplete'] as const;
+const ALLOWED_ROLE_VALUES = new Set([...Object.values(UserRole), 'user'] as string[]);
+const ALLOWED_WORK_STATUS = new Set(Object.values(WorkStatus));
 
 export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
   constructor(
@@ -22,22 +24,86 @@ export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
   }
 
   async execute({ userId, data, file }: SetupProfileInput): Promise<IUser> {
-    const { existingProfilePicture, ...rest } = data;
     const update: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(rest)) {
-      update[key] = (BOOLEAN_FIELDS as readonly string[]).includes(key) ? value === 'true' : value;
-    }
-
+    // ── Profile picture ─────────────────────────────────────────────────────
     if (file) {
-      update.profilePicture = await this.uploadService.uploadImage(file.buffer, 'profiles');
-    } else if (existingProfilePicture) {
-      update.profilePicture = existingProfilePicture;
+      const url = await this.uploadService.uploadImage(file.buffer, 'profiles');
+      update.profilePicture = url;
+    } else if (data.existingProfilePicture) {
+      update.profilePicture = data.existingProfilePicture;
     }
 
-    const user = await this.userRepo.update(userId, update as any);
+    // ── Basic profile fields — each saved to its own schema column ──────────
+    const simpleFields = ['firstName', 'lastName', 'phone', 'location'] as const;
+    for (const key of simpleFields) {
+      if (data[key] !== undefined) update[key] = data[key].trim();
+    }
+
+    // ── Role ─────────────────────────────────────────────────────────────────
+    if (data.role && ALLOWED_ROLE_VALUES.has(data.role as UserRole)) {
+      update.role = data.role as UserRole;
+    }
+
+    // ── Role-specific context fields — each saved individually ───────────────
+    // jobseeker: jobTitle
+    // recruiter: company, jobTitle
+    // student:   school, degree, fieldOfStudy, startYear
+    const contextFields = [
+      'jobTitle', 'company', 'school', 'degree', 'fieldOfStudy', 'startYear',
+    ] as const;
+    for (const key of contextFields) {
+      if (data[key] !== undefined) update[key] = data[key].trim();
+    }
+
+    // ── Headline — auto-built from role + context fields ────────────────────
+    // Keep headline in sync so the feed shows something meaningful on posts.
+    const headline = this.buildHeadline(data);
+    if (headline) update.headline = headline;
+
+    // ── Work status ──────────────────────────────────────────────────────────
+    if (data.workStatus && ALLOWED_WORK_STATUS.has(data.workStatus as WorkStatus)) {
+      update.workStatus = data.workStatus;
+    }
+
+    // ── Onboarding complete flag ─────────────────────────────────────────────
+    if (data.onboardingComplete === 'true') {
+      update.onboardingComplete = true;
+    }
+
+    const user = await this.userRepo.update(userId, update as Partial<IUser>);
     if (!user) throw AppError.notFound('User not found.', ErrorCode.USER_NOT_FOUND);
 
     return user;
+  }
+
+  private buildHeadline(data: Record<string, string>): string {
+    const role = data.role;
+
+    if (role === UserRole.JOBSEEKER) {
+      // "Frontend Developer" or "Frontend Developer at Acme"
+      const parts = [data.jobTitle?.trim(), data.company?.trim()].filter(Boolean);
+      return parts.join(' at ');
+    }
+
+    if (role === UserRole.RECRUITER) {
+      // "HR Manager at Infosys"
+      const parts = [data.jobTitle?.trim(), data.company?.trim()].filter(Boolean);
+      return parts.join(' at ');
+    }
+
+    if (role === UserRole.STUDENT) {
+      // "B.Tech in Computer Science at NIT Calicut (2022)"
+      const parts: string[] = [];
+      if (data.degree?.trim())       parts.push(data.degree.trim());
+      if (data.fieldOfStudy?.trim()) parts.push(`in ${data.fieldOfStudy.trim()}`);
+      if (data.school?.trim())       parts.push(`at ${data.school.trim()}`);
+      if (data.startYear?.trim())    parts.push(`(${data.startYear.trim()})`);
+      return parts.join(' ');
+    }
+
+    // No role — use whatever partial info exists
+    if (data.jobTitle?.trim()) return data.jobTitle.trim();
+    return '';
   }
 }

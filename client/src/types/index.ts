@@ -1,6 +1,6 @@
 // ─── Auth / User ──────────────────────────────────────────────────────────────
 export type AuthProvider = 'email' | 'google';
-export type UserRole     = 'jobseeker' | 'student';
+export type UserRole     = 'jobseeker' | 'student' | 'recruiter';
 export enum UserStatus {
   ACTIVE    = 'active',
   SUSPENDED = 'suspended',
@@ -13,8 +13,20 @@ export interface AuthUser {
   firstName?: string;
   lastName?: string;
   profilePicture?: string;
+  headline?: string;
   onboardingComplete: boolean;
   status?: UserStatus;
+  workStatus?: string;
+  role?: 'jobseeker' | 'student' | 'recruiter';
+  // Context fields — stored in DB and available client-side
+  phone?: string;
+  location?: string;
+  company?: string;
+  jobTitle?: string;
+  school?: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  startYear?: string;
 }
 
 export type AuthMethod = 'email' | 'google' | null;

@@ -21,5 +21,5 @@ export const protectAdmin = (req: Request, res: Response, next: NextFunction): v
 };
 
 export const signAdminToken = (email: string): string => {
-  return jwt.sign({ role: 'admin', email }, adminSecret(), { expiresIn: '8h' });
+  return jwt.sign({ role: 'admin', email }, adminSecret(), { expiresIn: '3d' });
 };

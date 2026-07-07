@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Appeal, AppealStatus, SuspendedState, AppealReviewedEvent, AccountStatusChangedEvent } from '../../types';
 
 const API = import.meta.env.VITE_API_URL as string;
+const token = localStorage.getItem("accessToken");
 
 const BADGE: Record<AppealStatus, { cls: string; label: string }> = {
   pending:  { cls: 'bg-amber-50 text-amber-700 border-amber-200',      label: 'Pending Review' },
@@ -87,7 +88,7 @@ export default function SuspendedPage() {
       fd.append('userId', String(userId));
       fd.append('explanation', explanation);
       images.forEach(img => fd.append('evidence', img));
-      const res = await axios.post(`${API}/admin/appeals/suspension`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const res = await axios.post(`${API}/admin/appeals/suspension`, fd, { headers: {  Authorization: `Bearer ${token}`,'Content-Type': 'multipart/form-data' } });
       setAppeals(prev => [{ ...res.data.data, status: 'pending' } as Appeal, ...prev]);
       setExplanation('');
       setImages([]);

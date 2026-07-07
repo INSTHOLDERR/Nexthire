@@ -1,57 +1,58 @@
 import Redis from 'ioredis';
 
-/**
- * CacheService wraps ioredis with typed get/set/invalidate helpers.
- *
- * Why a dedicated class instead of calling redis directly in controllers:
- * - Single Responsibility: controllers decide *what* to cache; this class
- *   decides *how* (serialization, TTL, connection error handling)
- * - If we ever swap Redis for another cache (Memcached, in-memory fallback)
- *   only this file changes — use sites stay untouched (Dependency Inversion)
- * - Connection errors are caught here and logged as warnings, not thrown —
- *   a cache miss is never worse than no cache at all, so a Redis outage
- *   should degrade gracefully rather than take down the whole server
- */
 export class CacheService {
-  private readonly client: Redis;
+  private client: Redis | null = null;
   private readonly defaultTTL: number;
+  private readonly enabled: boolean;
 
   constructor(ttlSeconds = 60) {
     this.defaultTTL = ttlSeconds;
 
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const redisUrl = process.env.REDIS_URL;
 
-    this.client = new Redis(redisUrl, {
-      lazyConnect: true,        // don't connect until first command
-      enableOfflineQueue: false, // fail fast if not connected — don't queue
-      maxRetriesPerRequest: 1,  // one retry, then give up rather than hanging
+    // If REDIS_URL is not set at all, disable cache entirely — no connection
+    // attempts, no error logs, zero performance cost for dev environments
+    // that don't run Redis.
+    if (!redisUrl) {
+      this.enabled = false;
+      return;
+    }
+
+    this.enabled = true;
+    this.client  = new Redis(redisUrl, {
+      lazyConnect:        true,   // don't connect until first command
+      enableOfflineQueue: false,  // fail fast rather than queuing
+      maxRetriesPerRequest: 0,    // no retries — treat any failure as a miss
+      connectTimeout: 3000,       // give up after 3 seconds
     });
 
-    this.client.on('error', (err) => {
-      // Log but never throw — a cache miss is always acceptable
-      console.warn('[Cache] Redis error (cache disabled for this request):', err.message);
+    // Log connection events once — don't spam every failed request
+    let warned = false;
+    this.client.on('error', (err: Error) => {
+      if (!warned) {
+        console.warn('[Cache] Redis unavailable — caching disabled:', err.message);
+        warned = true;
+      }
+    });
+
+    this.client.on('connect', () => {
+      warned = false; // reset so re-connections are logged
+      console.log('[Cache] Redis connected ✅');
     });
   }
 
-  /**
-   * Get a cached value by key.
-   * Returns null (cache miss) if the key doesn't exist OR if Redis is down.
-   */
   async get<T>(key: string): Promise<T | null> {
+    if (!this.enabled || !this.client) return null;
     try {
       const raw = await this.client.get(key);
-      if (!raw) return null;
-      return JSON.parse(raw) as T;
+      return raw ? (JSON.parse(raw) as T) : null;
     } catch {
-      return null; // treat any error as a cache miss, never throw
+      return null;
     }
   }
 
-  /**
-   * Set a cache entry with an optional TTL (defaults to this.defaultTTL).
-   * Silently swallows errors so callers never need to wrap this in try/catch.
-   */
   async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+    if (!this.enabled || !this.client) return;
     try {
       await this.client.set(
         key,
@@ -64,28 +65,22 @@ export class CacheService {
     }
   }
 
-  /**
-   * Delete all keys matching a pattern (e.g. 'admin:users:*' to clear all
-   * user query caches when any user's status changes).
-   * Uses SCAN instead of KEYS to avoid blocking Redis on large key sets.
-   */
   async invalidatePattern(pattern: string): Promise<void> {
+    if (!this.enabled || !this.client) return;
     try {
       let cursor = '0';
       do {
-        const [nextCursor, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-        cursor = nextCursor;
-        if (keys.length > 0) {
-          await this.client.del(...keys);
-        }
+        const [next, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = next;
+        if (keys.length > 0) await this.client.del(...keys);
       } while (cursor !== '0');
     } catch {
       // silently skip
     }
   }
 
-  /** Delete a single key explicitly. */
   async invalidate(key: string): Promise<void> {
+    if (!this.enabled || !this.client) return;
     try {
       await this.client.del(key);
     } catch {
@@ -94,4 +89,4 @@ export class CacheService {
   }
 }
 
-export default new CacheService(60); // 60-second default TTL
+export default new CacheService(60);
