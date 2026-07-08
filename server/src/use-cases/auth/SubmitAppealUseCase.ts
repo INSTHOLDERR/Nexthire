@@ -60,6 +60,10 @@ export class SubmitAppealUseCase extends UseCase<SubmitAppealInput, AppealRespon
 
     if (io) io.to('admin').emit('new_appeal', new AppealResponseDTO(populated ?? appeal));
 
+    // Persist in the admin activity feed too (bell survives page reloads)
+    const { notifyAdmins } = await import('../../infrastructure/database/models/AdminNotificationModel');
+    notifyAdmins(io, 'account_appeal', `⚖️ New ${type} appeal submitted`, { refType: 'user', refId: String(userId) });
+
     return new AppealResponseDTO(appeal);
   }
 }

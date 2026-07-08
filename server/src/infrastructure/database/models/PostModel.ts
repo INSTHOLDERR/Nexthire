@@ -53,19 +53,16 @@ export const CommentModel = mongoose.model('Comment', commentSchema);
 
 const reportSchema = new Schema(
   {
-    // What is being reported — a post or a user
+
     targetType:   { type: String, enum: ['post', 'user'], default: 'post' },
-    postId:       { type: Schema.Types.ObjectId, ref: 'Post', default: null },   // required when targetType === 'post'
-    targetUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },   // required when targetType === 'user'
+    postId:       { type: Schema.Types.ObjectId, ref: 'Post', default: null },  
+    targetUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },   
     reportedBy:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
     reason:       { type: String, enum: ['spam','harassment','misinformation','inappropriate','copyright','other'], required: true },
     description:  { type: String, maxlength: 2000 },
     evidenceUrls: [{ type: String }],
     status:       { type: String, enum: ['pending','reviewed','resolved'], default: 'pending' },
     adminNote:    { type: String },
-
-    // The reported user's / post owner's side of the story (defence).
-    // Admins see it next to the report before taking action.
     targetResponse:    { type: String, default: '', maxlength: 2000 },
     targetRespondedAt: { type: Date, default: null },
   },

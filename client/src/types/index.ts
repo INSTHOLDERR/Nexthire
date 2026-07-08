@@ -114,6 +114,7 @@ export interface ApiResponse<T = unknown> {
 
 // ─── Suspension page state ────────────────────────────────────────────────────
 export interface SuspendedState {
+  appealToken?: string;
   userId?: string;
   suspensionReason?: string;
   suspendedAt?: string;
@@ -121,6 +122,7 @@ export interface SuspendedState {
 }
 
 export interface BannedState {
+  appealToken?: string;
   userId?: string;
   banReason?: string;
   bannedAt?: string;

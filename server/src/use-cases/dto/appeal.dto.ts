@@ -1,12 +1,7 @@
 import { IAppeal } from '../../domain/entities/appeal.types';
 import { AppealStatus, AppealType } from '../../domain/entities/enums';
 
-/**
- * AppealResponseDTO — shapes the appeal data sent back to either the
- * user (after submitting) or the admin (in the appeals list).
- * Populated userId is typed as a nested object since we always populate
- * the user reference when returning appeals to admin.
- */
+
 export class AppealResponseDTO {
   readonly id: string;
   readonly type: AppealType;
@@ -33,7 +28,7 @@ export class AppealResponseDTO {
     this.adminNote   = appeal.adminNote;
     this.createdAt   = appeal.createdAt;
 
-    // userId is either a plain string (not populated) or a populated user document
+  
     const uid = appeal.userId as any;
     if (typeof uid === 'string') {
       this.userId = uid;

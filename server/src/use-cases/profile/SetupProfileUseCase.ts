@@ -34,7 +34,6 @@ export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
       update.profilePicture = data.existingProfilePicture;
     }
 
-    // ── Basic profile fields — each saved to its own schema column ──────────
     const simpleFields = ['firstName', 'lastName', 'phone', 'location'] as const;
     for (const key of simpleFields) {
       if (data[key] !== undefined) update[key] = data[key].trim();
@@ -45,10 +44,7 @@ export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
       update.role = data.role as UserRole;
     }
 
-    // ── Role-specific context fields — each saved individually ───────────────
-    // jobseeker: jobTitle
-    // recruiter: company, jobTitle
-    // student:   school, degree, fieldOfStudy, startYear
+
     const contextFields = [
       'jobTitle', 'company', 'school', 'degree', 'fieldOfStudy', 'startYear',
     ] as const;
@@ -57,7 +53,7 @@ export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
     }
 
     // ── Headline — auto-built from role + context fields ────────────────────
-    // Keep headline in sync so the feed shows something meaningful on posts.
+   
     const headline = this.buildHeadline(data);
     if (headline) update.headline = headline;
 
@@ -81,19 +77,17 @@ export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
     const role = data.role;
 
     if (role === UserRole.JOBSEEKER) {
-      // "Frontend Developer" or "Frontend Developer at Acme"
       const parts = [data.jobTitle?.trim(), data.company?.trim()].filter(Boolean);
       return parts.join(' at ');
     }
 
     if (role === UserRole.RECRUITER) {
-      // "HR Manager at Infosys"
+    
       const parts = [data.jobTitle?.trim(), data.company?.trim()].filter(Boolean);
       return parts.join(' at ');
     }
 
     if (role === UserRole.STUDENT) {
-      // "B.Tech in Computer Science at NIT Calicut (2022)"
       const parts: string[] = [];
       if (data.degree?.trim())       parts.push(data.degree.trim());
       if (data.fieldOfStudy?.trim()) parts.push(`in ${data.fieldOfStudy.trim()}`);
@@ -102,7 +96,6 @@ export class SetupProfileUseCase extends UseCase<SetupProfileInput, IUser> {
       return parts.join(' ');
     }
 
-    // No role — use whatever partial info exists
     if (data.jobTitle?.trim()) return data.jobTitle.trim();
     return '';
   }

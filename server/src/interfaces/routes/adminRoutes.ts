@@ -27,7 +27,7 @@ router.get('/appeals/user/:userId',        protectAdmin, getUserAppeals);
 
 // ─── Dashboard stats ──────────────────────────────────────────────────────────
 
-// ─── Detail views: everything about ONE user / ONE post in a single call ─────
+
 
 router.get('/users/:userId/detail', protectAdmin, async (req, res, next) => {
   try {
@@ -43,7 +43,7 @@ router.get('/users/:userId/detail', protectAdmin, async (req, res, next) => {
     const myPostIds = await PostModel.find({ authorId: user._id }).distinct('_id');
 
     const [reportsAgainst, warnings, appeals, postsCount] = await Promise.all([
-      // Reports on the user directly AND on any of their posts
+
       ReportModel.find({
         $or: [
           { targetType: 'user', targetUserId: user._id },
@@ -81,8 +81,7 @@ router.get('/posts/:postId/detail', protectAdmin, async (req, res, next) => {
 
 router.get('/stats', protectAdmin, async (_req, res, next) => {
   try {
-    // Serve from Redis when available — the dashboard polls this endpoint and
-    // the 17 countDocuments queries are needlessly heavy to run every time.
+
     const { default: cache } = await import('../../infrastructure/services/CacheService');
     const cached = await cache.get<Record<string, unknown>>('admin:stats');
     if (cached) return res.json({ success: true, data: cached, cached: true });
@@ -132,8 +131,28 @@ router.get('/stats', protectAdmin, async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Moderation queue: everything pending, with the user each item belongs to ──
-// Powers the "Needs review" strips at the top of the Users and Posts sections.
+// ─── Admin notification feed (bell) ───────────────────────────────────────────
+
+router.get('/notifications', protectAdmin, async (_req, res, next) => {
+  try {
+    const { AdminNotificationModel } = await import('../../infrastructure/database/models/AdminNotificationModel');
+    const [items, unread] = await Promise.all([
+      AdminNotificationModel.find().sort({ createdAt: -1 }).limit(30),
+      AdminNotificationModel.countDocuments({ read: false }),
+    ]);
+    res.json({ success: true, data: { notifications: items, unread } });
+  } catch (err) { next(err); }
+});
+
+router.patch('/notifications/read-all', protectAdmin, async (_req, res, next) => {
+  try {
+    const { AdminNotificationModel } = await import('../../infrastructure/database/models/AdminNotificationModel');
+    await AdminNotificationModel.updateMany({ read: false }, { read: true });
+    res.json({ success: true, data: { done: true } });
+  } catch (err) { next(err); }
+});
+
+
 
 router.get('/moderation-queue', protectAdmin, async (_req, res, next) => {
   try {
@@ -162,9 +181,7 @@ router.get('/moderation-queue', protectAdmin, async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Per-user overview: everything about one user in a single call ────────────
-// Profile + reports against them + warnings + account appeals — the Users
-// section drawer is built entirely from this.
+
 
 router.get('/users/:userId/overview', protectAdmin, async (req, res, next) => {
   try {
@@ -180,7 +197,7 @@ router.get('/users/:userId/overview', protectAdmin, async (req, res, next) => {
     const myPostIds = await PostModel.find({ authorId: userId }).distinct('_id');
 
     const [reports, warnings, appeals, postsCount] = await Promise.all([
-      // Reports where this user is the offender: direct user reports + reports on their posts
+
       ReportModel.find({
         $or: [
           { targetType: 'user', targetUserId: userId },
@@ -199,7 +216,7 @@ router.get('/users/:userId/overview', protectAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Per-post overview: post + all reports against it ─────────────────────────
+
 
 router.get('/posts/:postId/overview', protectAdmin, async (req, res, next) => {
   try {
@@ -297,17 +314,12 @@ router.get('/reports', protectAdmin, async (req, res, next) => {
         .skip((page - 1) * limit).limit(limit),
       ReportModel.countDocuments(filter),
     ]);
-    // Per-target active report counts help the admin judge escalation
+
     res.json({ success: true, data: { reports: docs, total, page, pages: Math.ceil(total / limit) } });
   } catch (err) { next(err); }
 });
 
-// Review a report with an action:
-//   dismiss       → mark reviewed, nothing else
-//   warn          → create a Warning for the offending user (+ notify)
-//   suspend_post  → post.status = suspended (+ notify author)
-//   suspend_user  → user.status = suspended
-//   ban_user      → user.status = banned
+// Review a report with an action
 router.patch('/reports/:reportId/action', protectAdmin, async (req, res, next) => {
   try {
     const { action, adminNote } = req.body as { action: string; adminNote?: string };
@@ -319,7 +331,7 @@ router.patch('/reports/:reportId/action', protectAdmin, async (req, res, next) =
     const report: any = await ReportModel.findById(req.params.reportId).populate('postId', '_id title authorId');
     if (!report) return res.status(404).json({ success: false, message: 'Report not found.' });
 
-    // Who is the offending user for this report?
+  
     const offenderId: string | null = report.targetType === 'user'
       ? String(report.targetUserId)
       : report.postId ? String((report.postId as any).authorId) : null;
@@ -400,7 +412,7 @@ router.get('/warnings', protectAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Review a warning appeal: approve → warning revoked; reject → warning stays active
+
 router.patch('/warnings/:id/appeal-review', protectAdmin, async (req, res, next) => {
   try {
     const { decision, adminNote } = req.body as { decision: 'approved' | 'rejected'; adminNote?: string };
@@ -438,18 +450,22 @@ router.patch('/warnings/:id/revoke', protectAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Appeal submission — protectAllowRestricted verifies JWT but allows banned/suspended
-// users through (they are exactly who needs to submit an appeal).
-// requireRole ensures only real, onboarded users (not anonymous) can submit.
+
+router.get('/appeals/mine', protectAllowRestricted, async (req, res, next) => {
+  try {
+    const { AppealModel } = await import('../../infrastructure/database/models/AppealModel');
+    const docs = await AppealModel.find({ userId: req.user!.id }).sort({ createdAt: -1 });
+    res.json({ success: true, data: docs });
+  } catch (err) { next(err); }
+});
+
 router.post('/appeals/suspension',
   protectAllowRestricted,
-  requireRole(UserRole.JOBSEEKER, UserRole.STUDENT),
   upload.array('evidence', 5),
   submitAppeal(AppealType.SUSPENSION)
 );
 router.post('/appeals/ban',
   protectAllowRestricted,
-  requireRole(UserRole.JOBSEEKER, UserRole.STUDENT),
   upload.array('evidence', 5),
   submitAppeal(AppealType.BAN)
 );

@@ -32,6 +32,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
           email: user.email,
           banReason: user.banReason,
           bannedAt: user.bannedAt,
+          appealToken: jwtService.generate(String(user._id)),
         },
       });
       return;
@@ -48,6 +49,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
           suspensionReason: user.suspensionReason,
           suspendedAt: user.suspendedAt,
           suspendedUntil: user.suspendedUntil,
+          appealToken: jwtService.generate(String(user._id)),
         },
       });
       return;
@@ -60,12 +62,6 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
   }
 };
 
-/**
- * Lighter protect middleware used specifically for appeal submission routes.
- * Verifies the JWT and sets req.user, but does NOT block based on
- * account status — because banned/suspended users are exactly the ones
- * who need to submit an appeal. The use case validates status internally.
- */
 export const protectAllowRestricted = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
@@ -84,7 +80,7 @@ export const protectAllowRestricted = async (req: Request, res: Response, next: 
       return;
     }
 
-    // Deliberately does NOT check user.status here.
+
     req.user = { ...user, id: String(user._id) };
     next();
   } catch {

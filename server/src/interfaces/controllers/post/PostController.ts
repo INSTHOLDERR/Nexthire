@@ -47,6 +47,12 @@ export const createPost = async (req: Request, res: Response, next: NextFunction
       files: (req.files as Express.Multer.File[]) ?? [],
     });
     req.app.locals.io?.to('feed').emit('new_post', post);
+    {
+      const { notifyAdmins } = await import('../../../infrastructure/database/models/AdminNotificationModel');
+      const a = (post as any).author;
+      const authorName = a?.firstName ? `${a.firstName} ${a.lastName ?? ''}`.trim() : 'A user';
+      notifyAdmins(req.app.locals.io, 'new_post', `📝 New post by ${authorName}: "${(post as any).title}"`, { refType: 'post', refId: String((post as any).id ?? (post as any)._id) });
+    }
     return ok(res, post, 201);
   } catch (err) { next(err); }
 };
@@ -140,7 +146,15 @@ export const reportPost = async (req: Request, res: Response, next: NextFunction
       evidenceFiles: (req.files as Express.Multer.File[]) ?? [],
     });
 
-    // Let the post owner know (reporter stays anonymous) so they can respond.
+    // Admin activity feed: a post was reported
+    {
+      const { notifyAdmins } = await import('../../../infrastructure/database/models/AdminNotificationModel');
+      const { PostModel: PM } = await import('../../../infrastructure/database/models/PostModel');
+      const reported: any = await PM.findById(req.params.postId).select('title');
+      notifyAdmins(req.app.locals.io, 'post_report', `🚩 Post reported (${req.body.reason}): "${reported?.title ?? 'a post'}"`, { refType: 'post', refId: req.params.postId });
+    }
+
+
     try {
       const { PostModel } = await import('../../../infrastructure/database/models/PostModel');
       const { NotificationModel } = await import('../../../infrastructure/database/models/SocialModels');
@@ -189,6 +203,20 @@ export const adminUpdatePostStatus = async (req: Request, res: Response, next: N
 
 export const adminDeletePost = async (req: Request, res: Response, next: NextFunction) => {
   try {
+
+    try {
+      const { PostModel: PM } = await import('../../../infrastructure/database/models/PostModel');
+      const { NotificationModel } = await import('../../../infrastructure/database/models/SocialModels');
+      const doomed: any = await PM.findById(req.params.postId).select('authorId title');
+      if (doomed) {
+        const n = await NotificationModel.create({
+          userId: doomed.authorId, type: 'admin_note',
+          message: `Your post "${doomed.title}" was removed by the moderation team after review.`,
+        });
+        req.app.locals.io?.to(`user:${doomed.authorId}`).emit('notification', n);
+      }
+    } catch { /* notification failure must not block deletion */ }
+
     await postRepo.delete(req.params.postId);
     return ok(res, { deleted: true });
   } catch (err) { next(err); }

@@ -1,9 +1,4 @@
-/**
- * Single source of truth for every machine-readable error code the API can
- * return. The frontend's ApiResponse.code field switches on these — never
- * on the free-text `message`, which can change wording without breaking
- * frontend logic.
- */
+
 export enum ErrorCode {
   // Auth — registration / login
   EMAIL_EXISTS         = 'EMAIL_EXISTS',

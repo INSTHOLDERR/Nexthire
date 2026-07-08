@@ -8,7 +8,6 @@ import { useAuth } from '../../hooks/useAuth';
 import { Appeal, AppealStatus, SuspendedState, AppealReviewedEvent, AccountStatusChangedEvent } from '../../types';
 
 const API = import.meta.env.VITE_API_URL as string;
-const token = localStorage.getItem("accessToken");
 
 const BADGE: Record<AppealStatus, { cls: string; label: string }> = {
   pending:  { cls: 'bg-amber-50 text-amber-700 border-amber-200',      label: 'Pending Review' },
@@ -40,12 +39,19 @@ export default function SuspendedPage() {
   const pageState = (state ?? ssState ?? {}) as SuspendedState;
   const userId = user?.id ?? pageState?.userId;
 
+  // The server includes an `appealToken` in every suspension rejection
+  // (login, Google login, or mid-session). Users who were logged in when
+  // suspended still have their normal token — either works, because the
+  // appeal routes use protectAllowRestricted (JWT check without status check).
+  const appealToken = pageState?.appealToken ?? localStorage.getItem('nh_token') ?? '';
+  const authHeaders = appealToken ? { Authorization: `Bearer ${appealToken}` } : {};
+
   const fmt = (d?: string | Date) =>
     d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A';
 
   useEffect(() => {
     if (!userId) { setAppealsLoading(false); return; }
-    axios.get(`${API}/admin/appeals/user/${userId}`)
+    axios.get(`${API}/admin/appeals/mine`, { headers: authHeaders })
       .then(r => setAppeals(r.data.data as Appeal[]))
       .catch(() => {})
       .finally(() => setAppealsLoading(false));
@@ -82,13 +88,15 @@ export default function SuspendedPage() {
   const handleSubmit = async () => {
     if (!explanation.trim()) return toast.error('Please write an explanation');
     if (!userId) return toast.error('Session error — please try signing in again.');
+    if (!appealToken) return toast.error('Session expired — go back and sign in once more, then submit your appeal.');
     setLoading(true);
     try {
       const fd = new FormData();
-      fd.append('userId', String(userId));
       fd.append('explanation', explanation);
       images.forEach(img => fd.append('evidence', img));
-      const res = await axios.post(`${API}/admin/appeals/suspension`, fd, { headers: {  Authorization: `Bearer ${token}`,'Content-Type': 'multipart/form-data' } });
+      const res = await axios.post(`${API}/admin/appeals/suspension`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data', ...authHeaders },
+      });
       setAppeals(prev => [{ ...res.data.data, status: 'pending' } as Appeal, ...prev]);
       setExplanation('');
       setImages([]);

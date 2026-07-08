@@ -36,7 +36,7 @@ export class CacheService {
     });
 
     this.client.on('connect', () => {
-      warned = false; // reset so re-connections are logged
+      warned = false; 
       console.log('[Cache] Redis connected ✅');
     });
   }
@@ -61,7 +61,7 @@ export class CacheService {
         ttlSeconds ?? this.defaultTTL
       );
     } catch {
-      // silently skip — cache write failure is never fatal
+    
     }
   }
 
@@ -75,7 +75,7 @@ export class CacheService {
         if (keys.length > 0) await this.client.del(...keys);
       } while (cursor !== '0');
     } catch {
-      // silently skip
+
     }
   }
 

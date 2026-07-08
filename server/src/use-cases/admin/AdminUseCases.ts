@@ -243,9 +243,7 @@ interface AdminLoginInput { email: string; password: string }
 interface AdminLoginOutput { email: string }
 
 export class AdminLoginUseCase extends UseCase<AdminLoginInput, AdminLoginOutput> {
-  // No real async work happens here (env var comparison is synchronous),
-  // but execute() is declared `async` to satisfy the abstract base class's
-  // Promise<TOutput> contract uniformly across every use case in the app.
+
   async execute({ email, password }: AdminLoginInput): Promise<AdminLoginOutput> {
     const ADMIN_EMAIL = process.env.ADMIN_EMAIL as string;
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD as string;

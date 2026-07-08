@@ -709,6 +709,7 @@ export function UserDetailDrawer({ userId, onClose, onUserChanged }: { userId: s
   const [loading, setLoading] = useState(true);
   const [reviewingAppeal, setReviewingAppeal] = useState<OverviewAppeal | null>(null);
   const [reviewingWarning, setReviewingWarning] = useState<AdminWarning | null>(null);
+  const [appealLightbox, setAppealLightbox] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<string>('');
 
@@ -841,6 +842,20 @@ export function UserDetailDrawer({ userId, onClose, onUserChanged }: { userId: s
                         <span className="text-xs text-slate-400 ml-auto">{fmt(a.createdAt)}</span>
                       </div>
                       <p className="text-sm text-slate-700">{a.explanation}</p>
+                      {(a.evidence?.length ?? 0) > 0 && (
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          {a.evidence!.map((url, i) => (
+                            <img
+                              key={i}
+                              src={url}
+                              alt={`Appeal evidence ${i + 1}`}
+                              onClick={() => setAppealLightbox(url)}
+                              className="w-14 h-14 rounded-lg object-cover border border-slate-200 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-blue-300 transition-all"
+                              title="Click to enlarge"
+                            />
+                          ))}
+                        </div>
+                      )}
                       {a.adminNote && <p className="text-xs text-slate-500 mt-1.5"><span className="font-bold">Your reply:</span> {a.adminNote}</p>}
                       {a.status === 'pending' && (
                         <button onClick={() => { setReviewingAppeal(a); setNote(''); }} className="mt-2 px-2.5 py-1.5 text-[11px] font-bold border border-blue-200 text-blue-700 rounded-xl hover:bg-blue-50 cursor-pointer">Review appeal</button>
@@ -848,6 +863,13 @@ export function UserDetailDrawer({ userId, onClose, onUserChanged }: { userId: s
                     </div>
                   ))}
                 </div>}
+          </div>
+        )}
+
+        {/* Appeal evidence lightbox */}
+        {appealLightbox && (
+          <div className="fixed inset-0 z-[85] bg-black/90 flex items-center justify-center p-4" onClick={() => setAppealLightbox(null)}>
+            <img src={appealLightbox} alt="Appeal evidence" className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"/>
           </div>
         )}
 
@@ -876,6 +898,13 @@ export function UserDetailDrawer({ userId, onClose, onUserChanged }: { userId: s
               <h3 className="font-bold text-slate-900 mb-2">Review account appeal</h3>
               <div className="bg-slate-50 border border-slate-100 rounded-xl px-3.5 py-2.5 mb-3">
                 <p className="text-sm text-slate-700">{reviewingAppeal.explanation}</p>
+                {(reviewingAppeal.evidence?.length ?? 0) > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {reviewingAppeal.evidence!.map((url, i) => (
+                      <img key={i} src={url} alt="" onClick={() => setAppealLightbox(url)} className="w-14 h-14 rounded-lg object-cover border border-slate-200 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-blue-300 transition-all"/>
+                    ))}
+                  </div>
+                )}
               </div>
               <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Message to the user (required — sent by email)…" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"/>
               <div className="flex gap-3 mt-4">

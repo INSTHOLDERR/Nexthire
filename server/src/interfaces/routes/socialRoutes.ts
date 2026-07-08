@@ -4,6 +4,7 @@ import { protect } from '../middlewares/authMiddleware';
 import mongoose from 'mongoose';
 import uploadService from '../../infrastructure/services/CloudinaryService';
 import { WarningModel } from '../../infrastructure/database/models/WarningModel';
+import { notifyAdmins } from '../../infrastructure/database/models/AdminNotificationModel';
 import { NotificationModel } from '../../infrastructure/database/models/SocialModels';
 import { ConversationModel } from '../../infrastructure/database/models/SocialModels';
 import { MessageModel } from '../../infrastructure/database/models/SocialModels';
@@ -246,7 +247,7 @@ router.get('/conversations', async (req: Request, res: Response, next: NextFunct
       .populate('pendingMembers', '_id firstName lastName profilePicture')
       .sort({ lastMessageAt: -1, updatedAt: -1 });
 
-    // Group invites waiting for MY response
+  
     const invites = await ConversationModel.find({ isGroup: true, pendingMembers: myId })
       .populate('participants', '_id firstName lastName profilePicture')
       .populate('requestedBy', '_id firstName lastName profilePicture')
@@ -348,7 +349,7 @@ router.post('/conversations/:id/messages', upload.single('media'), async (req: R
       return res.status(403).json({ success: false, message: 'Not a participant.' });
     }
     // Direct chats must be accepted; the requester may keep sending while pending
-    // (WhatsApp-style: messages queue in the request until accepted).
+  
     if (!conv.isGroup && conv.status === 'ignored') {
       return res.status(403).json({ success: false, message: 'Conversation not active.' });
     }
@@ -378,7 +379,7 @@ router.post('/conversations/:id/messages', upload.single('media'), async (req: R
 
     const populated = await MessageModel.findById(msg._id).populate('senderId', '_id firstName lastName profilePicture');
 
-    // Emit to every other participant
+
     conv.participants.forEach(p => {
       if (String(p) !== myId) emit(req, `user:${p}`, 'new_message', { message: populated, conversationId: req.params.id });
     });
@@ -389,8 +390,7 @@ router.post('/conversations/:id/messages', upload.single('media'), async (req: R
 
 // ─── Group chats ──────────────────────────────────────────────────────────────
 
-// Create a group. Creator is a participant + admin; everyone else is invited
-// (pendingMembers) and must accept before they join — like a group request.
+
 router.post('/groups', upload.single('avatar'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const myId = req.user!.id;
@@ -571,9 +571,7 @@ router.post('/groups/:id/leave', async (req: Request, res: Response, next: NextF
 // ─── Warnings (user side) ─────────────────────────────────────────────────────
 
 // ─── Reports against me ──────────────────────────────────────────────────────
-// The reported user (or reported post's owner) can see reports made against
-// them — WITHOUT the reporter's identity or evidence — and add one response
-// (their side of the story) that admins will see before taking action.
+
 
 router.get('/reports-against-me', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -607,7 +605,7 @@ router.get('/reports-against-me', async (req: Request, res: Response, next: Next
   } catch (err) { next(err); }
 });
 
-// Respond to a report made against me / my post (editable while still pending)
+
 router.post('/reports/:id/respond', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const myId = req.user!.id;
@@ -660,6 +658,13 @@ router.post('/my-warnings/:id/appeal', async (req: Request, res: Response, next:
     warning.appealStatus = 'pending';
     warning.status = 'appealed';
     await warning.save();
+
+    // Admin activity feed: a warning was appealed
+    {
+      const me = await UserModel.findById(req.user!.id).select('firstName lastName email');
+      const uName = me?.firstName ? `${me.firstName} ${me.lastName ?? ''}`.trim() : (me?.email ?? 'A user');
+      notifyAdmins(req.app.locals.io, 'warning_appeal', `⚠️ ${uName} appealed a warning: ${warning.reason}`, { refType: 'user', refId: req.user!.id });
+    }
     ok(res, warning);
   } catch (err) { next(err); }
 });
@@ -713,6 +718,13 @@ router.post('/report-user/:targetId', upload.array('evidence', 3), async (req: R
       description:  description?.slice(0, 2000),
       evidenceUrls,
     });
+
+    // Admin activity feed: a user was reported
+    {
+      const target = await UserModel.findById(targetId).select('firstName lastName email');
+      const tName = target?.firstName ? `${target.firstName} ${target.lastName ?? ''}`.trim() : (target?.email ?? 'a user');
+      notifyAdmins(req.app.locals.io, 'user_report', `👤 User reported (${reason}): ${tName}`, { refType: 'user', refId: targetId });
+    }
 
     // Tell the reported user (WITHOUT revealing who reported) so they can respond.
     try {

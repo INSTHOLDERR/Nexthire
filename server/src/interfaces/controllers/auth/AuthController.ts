@@ -27,7 +27,12 @@ const resendOTPUseCase = new ResendOTPUseCase(otpRepo, emailService);
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    res.status(201).json({ success: true, data: await registerUseCase.execute(req.body) });
+    const data = await registerUseCase.execute(req.body);
+
+    const { notifyAdmins } = await import('../../../infrastructure/database/models/AdminNotificationModel');
+    const name = [req.body?.firstName, req.body?.lastName].filter(Boolean).join(' ') || req.body?.email || 'Someone';
+    notifyAdmins(req.app.locals.io, 'new_user', `👤 New user registered: ${name}`);
+    res.status(201).json({ success: true, data });
   } catch (err) {
     next(err);
   }

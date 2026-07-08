@@ -17,8 +17,8 @@ export interface IPost {
   description: string;
   media: PostMedia[];
   visibility: PostVisibility;
-  status: PostStatus;      // active / suspended (admin) / removed (admin hard delete)
-  adminNote?: string;      // personal note from admin shown to post owner
+  status: PostStatus;     
+  adminNote?: string;      
   likes: string[];
   commentCount: number;
   shareCount?: number;
@@ -32,7 +32,7 @@ export interface IComment {
   _id: string;
   postId: string;
   authorId: string;
-  parentId?: string;       // null = top-level, set = reply to another comment
+  parentId?: string;       
   text: string;
   likes: string[];
   createdAt: Date;

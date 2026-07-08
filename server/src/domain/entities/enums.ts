@@ -1,10 +1,3 @@
-/**
- * Centralized enums for the entire application.
- * Every status, type, role, or provider value lives here as an enum
- * instead of scattered string literals — so a typo like 'baned' fails
- * at compile time instead of silently passing a wrong value at runtime.
- */
-
 export enum UserStatus {
   ACTIVE    = 'active',
   SUSPENDED = 'suspended',
@@ -17,10 +10,10 @@ export enum AuthProvider {
 }
 
 export enum UserRole {
-  USER      = 'user',      // completed onboarding but didn't choose open_to_work/hiring
-  JOBSEEKER = 'jobseeker', // open to work
-  STUDENT   = 'student',   // studying
-  RECRUITER = 'recruiter', // currently hiring
+  USER      = 'user',      
+  JOBSEEKER = 'jobseeker', 
+  STUDENT   = 'student',  
+  RECRUITER = 'recruiter', 
 }
 
 export enum AppealStatus {
@@ -41,7 +34,7 @@ export enum OTPSessionType {
 }
 
 export enum WorkStatus {
-  NONE             = 'none',              // hasn't set a status
-  OPEN_TO_WORK     = 'open_to_work',      // actively looking for a job
-  CURRENTLY_HIRING = 'currently_hiring',  // recruiter looking to hire
+  NONE             = 'none',             
+  OPEN_TO_WORK     = 'open_to_work',      
+  CURRENTLY_HIRING = 'currently_hiring', 
 }

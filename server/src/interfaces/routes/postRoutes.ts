@@ -31,12 +31,8 @@ const upload = multer({
   },
 });
 
-// ── Admin routes: registered BEFORE the user-auth wall below. Admin tokens are
-// signed with the admin secret and would FAIL the user `protect` middleware,
-// which was silently logging admins out (401 → token wiped) whenever the
-// admin dashboard touched a /posts/admin/* endpoint. protectAdmin does its
-// own auth, so these must not pass through `protect` at all.
-// ── Admin routes (static prefix, must be before /:postId) ───────────────────
+
+// ── Admin routes ───────────────────
 router.get('/admin/posts',                      protectAdmin, adminGetPosts);
 router.patch('/admin/posts/:postId/status',     protectAdmin, adminUpdatePostStatus);
 router.delete('/admin/posts/:postId',           protectAdmin, adminDeletePost);
@@ -46,11 +42,10 @@ router.patch('/admin/reports/:reportId/review', protectAdmin, adminReviewReport)
 // All user routes require auth
 router.use(protect);
 
-// ── Static-segment routes FIRST (must be before /:postId to avoid wrong matching) ──
 router.post('/comments/:commentId/like',        likeComment);
 router.delete('/comments/:commentId',           deleteComment);
 
-// Single post in feed-DTO shape (deep links / notifications / profile detail)
+
 router.get('/single/:postId', async (req, res, next) => {
   try {
     const { PostModel } = await import('../../infrastructure/database/models/PostModel');

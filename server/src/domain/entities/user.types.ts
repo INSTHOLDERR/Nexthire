@@ -25,7 +25,7 @@ export interface IExperience {
   jobTitle: string;
   company: string;
   employmentType: 'full-time' | 'part-time' | 'contract' | 'freelance' | 'internship' | 'volunteer';
-  startDate: string;   // ISO date string
+  startDate: string;  
   endDate?: string;
   isCurrent: boolean;
   location?: string;
@@ -55,8 +55,8 @@ export interface ILanguage {
 export interface IContact {
   _id: string;
   type: 'whatsapp' | 'linkedin' | 'github' | 'portfolio' | 'twitter' | 'instagram' | 'other';
-  value: string;       // phone number (with country code) or URL
-  label?: string;      // for 'other' type
+  value: string;       
+  label?: string;    
 }
 
 // ── Main User type ────────────────────────────────────────────────────────────
@@ -66,10 +66,8 @@ export interface IUser {
   email: string;
   password?: string;
   googleId?: string;
-
   authProvider: AuthProvider;
   isEmailVerified: boolean;
-
   firstName?: string;
   lastName?: string;
   profilePicture?: string;
@@ -83,7 +81,7 @@ export interface IUser {
   resumeUrl?: string;
   resumePublicId?: string;
 
-  // Professional context
+
   company?: string;
   jobTitle?: string;
   school?: string;
@@ -91,7 +89,7 @@ export interface IUser {
   fieldOfStudy?: string;
   startYear?: string;
 
-  // Profile sections
+
   skills:      ISkill[];
   projects:    IProject[];
   experiences: IExperience[];
@@ -99,19 +97,19 @@ export interface IUser {
   languages:   ILanguage[];
   contacts:    IContact[];
 
-  // Profile stats
+ 
   profileViews: number;
-  profileViewers: string[];   // recent viewer userIds
+  profileViewers: string[];   
 
   role?: UserRole;
   workStatus: WorkStatus;
 
-  // Social graph
+
   connections:        string[];
   pendingConnections: string[];
   connectionRequests: string[];
 
-  // Account state
+ 
   onboardingComplete: boolean;
   status: UserStatus;
 
@@ -122,7 +120,7 @@ export interface IUser {
   banReason?: string;
   bannedAt?: Date;
 
-  // Deactivation
+
   isDeactivated?: boolean;
   deactivatedAt?: Date;
 

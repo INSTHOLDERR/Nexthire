@@ -79,7 +79,7 @@ const userSchema = new Schema(
     resumePublicId: String,
     resumeOriginalName: String,
 
-    // Legacy onboarding fields (kept for backwards-compat)
+   
     company:      { type: String, trim: true, default: null },
     jobTitle:     { type: String, trim: true, default: null },
     school:       { type: String, trim: true, default: null },

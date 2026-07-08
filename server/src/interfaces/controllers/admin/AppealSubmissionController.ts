@@ -12,10 +12,11 @@ const submitAppealUseCase = new SubmitAppealUseCase(userRepo, appealRepo, upload
 export const submitAppeal = (type: AppealType) =>
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { userId, explanation } = req.body;
+      const { explanation } = req.body;
+      const userId = req.user?.id;
 
-      if (!userId?.trim()) {
-        throw AppError.badRequest('User ID is required.', ErrorCode.VALIDATION_ERROR);
+      if (!userId) {
+        throw AppError.unauthorized('Session error — sign in again to appeal.', ErrorCode.UNAUTHORIZED);
       }
       if (!explanation?.trim()) {
         throw AppError.badRequest('Explanation is required.', ErrorCode.VALIDATION_ERROR);

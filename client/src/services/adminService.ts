@@ -81,3 +81,8 @@ export const getUserOverview = (userId: string) => adminApi.get(`/admin/users/${
 export const getPostOverview = (postId: string) => adminApi.get(`/admin/posts/${postId}/overview`);
 
 export const getModerationQueue = () => adminApi.get('/admin/moderation-queue');
+
+// ── Admin notification feed ──────────────────────────────────────────────────
+export interface AdminNotification { _id: string; type: string; message: string; refType?: string | null; refId?: string | null; read: boolean; createdAt: string }
+export const getAdminNotifications = () => adminApi.get('/admin/notifications');
+export const markAdminNotificationsRead = () => adminApi.patch('/admin/notifications/read-all');

@@ -77,13 +77,6 @@ export class MongoOTPRepository extends BaseRepository<IOTPSession> implements I
     return doc ? this.mapToEntity(doc) : null;
   }
 
-  /**
-   * Checks `registrationExpiresAt` (the long window), NOT `expiresAt` (the
-   * short code window). This is the actual fix for resend-after-expiry:
-   * the OTP code itself can expire and resend must still succeed, because
-   * the registration intent — and the hashed password it's protecting —
-   * is governed by its own, separate, longer-lived expiry.
-   */
   async findPendingRegistration(email: string): Promise<IOTPSession | null> {
     const doc = await OTPSessionModel.findOne({
       email,

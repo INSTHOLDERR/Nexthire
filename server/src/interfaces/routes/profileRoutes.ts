@@ -13,10 +13,6 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 const ok  = (res: Response, data: unknown) => res.json({ success: true, data });
 const uid = (req: Request) => req.user!.id;
 
-// ══════════════════════════════════════════════════════════════════════════════
-// IMPORTANT: ALL /me/* static routes MUST come before the dynamic /:userId
-// route, or Express will match "me" as a userId parameter and fail.
-// ══════════════════════════════════════════════════════════════════════════════
 
 // ── Profile viewers list ─────────────────────────────────────────────────────
 
@@ -72,8 +68,7 @@ router.patch('/me/basic', upload.fields([
     ];
     FIELDS.forEach(f => { if (body[f] !== undefined) update[f] = body[f]; });
 
-    // Changing work status also changes the role:
-    //   open_to_work → jobseeker · currently_hiring → recruiter · none → user
+  
     if (update.workStatus !== undefined) {
       update.role =
         update.workStatus === 'open_to_work'     ? 'jobseeker'
@@ -91,10 +86,6 @@ router.patch('/me/basic', upload.fields([
     }
     if (files?.resume?.[0]) {
       const result = await cloudinary.uploadMedia(files.resume[0].buffer, 'nexthire/resumes', 'raw');
-      // Store the CLEAN url. The client derives:
-      //   view url     → resumeUrl (opens inline in the browser)
-      //   download url → resumeUrl with `fl_attachment:<name>` inserted
-      // Baking fl_attachment into the stored url would force "View Resume" to download instead of open.
       update.resumeUrl          = result.url;
       update.resumePublicId     = result.publicId;
       update.resumeOriginalName = files.resume[0].originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -303,7 +294,7 @@ router.get('/:userId/posts', async (req, res, next) => {
 });
 
 // ── Get a profile ─────────────────────────────────────────────────────────────
-// NOTE: This dynamic route must come LAST to avoid matching /me/* paths
+
 router.get('/:userId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const viewerId = uid(req);

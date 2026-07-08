@@ -1,11 +1,7 @@
 import { ErrorCode } from './error-codes';
 import { IUser } from '../../domain/entities/user.types';
 
-/**
- * The only error class the application layer throws. Always carries an
- * HTTP status and a machine-readable code, optionally extra `data`
- * (e.g. ban/suspend details the frontend needs to render a redirect page).
- */
+
 export class AppError extends Error {
   constructor(
     public readonly status: number,
@@ -46,14 +42,7 @@ export class AppError extends Error {
     return new AppError(500, message, ErrorCode.INTERNAL_ERROR);
   }
 
-  /**
-   * Always shapes ban/suspend payloads the same way: `userId` as a plain
-   * string, never the raw Mongoose document. The frontend's appeal pages
-   * (BannedPage, SuspendedPage) read `pageState.userId` directly — passing
-   * the raw IUser object here (which has `_id`, not `userId`) silently
-   * breaks that lookup and produces "Session error" when submitting an
-   * appeal, since userId ends up undefined.
-   */
+
   static bannedAccount(user: IUser) {
     return new AppError(403, 'This account has been banned.', ErrorCode.ACCOUNT_BANNED, {
       userId: String(user._id),

@@ -6,7 +6,7 @@ import { getSocket } from '../../hooks/useSocket';
 import { getUsers, setStatus, getAppeals, reviewAppeal } from '../../services/adminService';
 import { AdminUser, AdminAppeal, AdminAction, AppealStatus, UserStatus } from '../../types';
 import { DashboardPanel, PostsPanel, AdminStats, UserDetailDrawer, UsersReviewQueue } from './ModerationPanels';
-import { getAdminStats } from '../../services/adminService';
+import { getAdminStats, getAdminNotifications, markAdminNotificationsRead, AdminNotification } from '../../services/adminService';
 import type { AxiosError } from 'axios';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -161,6 +161,51 @@ export default function AdminDashboard() {
     catch { /* silent */ }
     finally { setStatsLoading(false); }
   }, []);
+
+  // Admin activity feed (bell): new users, posts, reports, appeals
+  const [adminNotifs, setAdminNotifs] = useState<AdminNotification[]>([]);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  const loadNotifs = useCallback(async () => {
+    try {
+      const res = await getAdminNotifications();
+      setAdminNotifs(res.data.data.notifications ?? []);
+      setUnreadNotifs(res.data.data.unread ?? 0);
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { loadNotifs(); }, [loadNotifs]);
+
+  const openBell = () => {
+    setShowBell(b => {
+      const opening = !b;
+      if (opening && unreadNotifs > 0) {
+        markAdminNotificationsRead().then(() => setUnreadNotifs(0)).catch(() => {});
+      }
+      return opening;
+    });
+  };
+
+  // Where each notification type should take the admin
+  const goToNotif = (n: AdminNotification) => {
+    setShowBell(false);
+    if (n.type === 'new_post' || n.type === 'post_report') setTab('posts');
+    else setTab('users');
+    loadStats();
+  };
+
+  const NOTIF_ICON: Record<string, string> = {
+    new_user: '👤', new_post: '📝', post_report: '🚩', user_report: '👤',
+    account_appeal: '⚖️', warning_appeal: '⚠️',
+  };
+
+  const notifAge = (d: string) => {
+    const s2 = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
+    if (s2 < 60) return 'just now';
+    if (s2 < 3600) return `${Math.floor(s2 / 60)}m ago`;
+    if (s2 < 86400) return `${Math.floor(s2 / 3600)}h ago`;
+    return `${Math.floor(s2 / 86400)}d ago`;
+  };
   const [users,       setUsers]       = useState<AdminUser[]>([]);
   const [appeals,     setAppeals]     = useState<AdminAppeal[]>([]);
   const [search,      setSearch]      = useState('');
@@ -243,6 +288,12 @@ export default function AdminDashboard() {
       setAppeals(prev => [appeal, ...prev]);
       loadStats();
       toast('📋 New appeal received', { icon: '🔔', duration: 5000 });
+    });
+    socket.on('admin_notification', (n: AdminNotification) => {
+      setAdminNotifs(prev => [n, ...prev].slice(0, 30));
+      setUnreadNotifs(u => u + 1);
+      loadStats();
+      toast(n.message, { icon: '🔔', duration: 4500 });
     });
     socket.on('appeal_updated', ({ appealId, status }: { appealId: string; status: AppealStatus }) => {
       setAppeals(prev => prev.map(a => String(a._id) === String(appealId) ? { ...a, status } : a));
@@ -352,15 +403,30 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {/* Notifications bell */}
             <div className="relative">
-              <button onClick={() => setShowBell(b => !b)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 relative cursor-pointer" title="Pending moderation">
+              <button onClick={openBell} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 relative cursor-pointer" title="Notifications & pending moderation">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                {bellCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{bellCount > 99 ? '99+' : bellCount}</span>}
+                {(bellCount + unreadNotifs) > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{(bellCount + unreadNotifs) > 99 ? '99+' : bellCount + unreadNotifs}</span>}
               </button>
               {showBell && (
-                <div className="absolute right-0 top-11 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-                  <p className="px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide border-b border-slate-100">Needs review</p>
+                <div className="absolute right-0 top-11 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  <p className="px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wide border-b border-slate-100">🔔 Activity</p>
+                  <div className="max-h-64 overflow-y-auto">
+                    {adminNotifs.length === 0 ? (
+                      <p className="px-4 py-4 text-sm text-slate-400 text-center">No activity yet</p>
+                    ) : adminNotifs.map(n => (
+                      <button key={n._id} onClick={() => goToNotif(n)} className={`w-full flex items-start gap-2.5 px-4 py-2.5 text-left hover:bg-slate-50 border-b border-slate-50 cursor-pointer ${!n.read ? 'bg-blue-50/40' : ''}`}>
+                        <span className="text-base flex-shrink-0 mt-0.5">{NOTIF_ICON[n.type] ?? '🔔'}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] font-medium text-slate-700 leading-snug">{n.message}</span>
+                          <span className="block text-[10px] text-slate-400 mt-0.5">{notifAge(n.createdAt)}</span>
+                        </span>
+                        {!n.read && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5"/>}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="px-4 py-2.5 text-xs font-bold text-slate-400 uppercase tracking-wide border-y border-slate-100 bg-slate-50/50">⏰ Needs review</p>
                   {bellCount === 0 ? (
-                    <p className="px-4 py-5 text-sm text-slate-400 text-center">All clear — nothing pending 🎉</p>
+                    <p className="px-4 py-4 text-sm text-slate-400 text-center">All clear — nothing pending 🎉</p>
                   ) : (
                     <>
                       {(stats?.reports.pendingPost ?? 0) > 0 && (
